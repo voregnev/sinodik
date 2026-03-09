@@ -8,7 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import Commemoration
 from app.services.query_service import get_commemorations, bulk_set_starts_at
-from app.services.period_calculator import calculate_expires_at
+from app.services.period_calculator import (
+    calculate_expires_at,
+    normalize_period_type,
+)
 
 router = APIRouter()
 
@@ -19,6 +22,7 @@ class CommemorationUpdate(BaseModel):
     order_type: str | None = None
     period_type: str | None = None
     prefix: str | None = None
+    suffix: str | None = None
 
 
 class BulkUpdateRequest(BaseModel):
@@ -55,18 +59,19 @@ async def update_commemoration(
     if body.order_type is not None:
         comm.order_type = body.order_type
     if body.period_type is not None:
-        comm.period_type = body.period_type
-        # Recalculate expires_at when period changes and starts_at is known
-        effective_starts = body.starts_at or comm.starts_at
-        if effective_starts:
-            comm.expires_at = calculate_expires_at(effective_starts, comm.period_type)
+        comm.period_type = normalize_period_type(body.period_type)
     if body.prefix is not None:
         comm.prefix = body.prefix
+    if body.suffix is not None:
+        comm.suffix = body.suffix
     if body.starts_at is not None:
         comm.starts_at = body.starts_at
-        if comm.expires_at is None or body.period_type is not None:
+
+    # Пересчёт даты окончания при изменении периода или даты начала
+    if body.period_type is not None or body.starts_at is not None:
+        if comm.starts_at:
             comm.expires_at = calculate_expires_at(comm.starts_at, comm.period_type)
-    if body.expires_at is not None:
+    elif body.expires_at is not None:
         comm.expires_at = body.expires_at
 
     await db.commit()
@@ -77,9 +82,27 @@ async def update_commemoration(
         "order_type": comm.order_type,
         "period_type": comm.period_type,
         "prefix": comm.prefix,
+        "suffix": comm.suffix,
         "starts_at": comm.starts_at.isoformat() if comm.starts_at else None,
         "expires_at": comm.expires_at.isoformat() if comm.expires_at else None,
     }
+
+
+@router.delete("/commemorations/{commemoration_id}")
+async def delete_commemoration(
+    commemoration_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Удалить одну запись поминовения (одно имя)."""
+    result = await db.execute(
+        select(Commemoration).where(Commemoration.id == commemoration_id)
+    )
+    comm = result.scalar_one_or_none()
+    if not comm:
+        raise HTTPException(status_code=404, detail="Commemoration not found")
+    await db.delete(comm)
+    await db.commit()
+    return {"deleted": commemoration_id}
 
 
 @router.post("/commemorations/bulk-update")

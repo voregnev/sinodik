@@ -368,7 +368,8 @@ function AddPage() {
     periodType: "Сорокоуст (40 дней)",
     names: "",
     startsAt: "",
-    needReceipt: false,
+    notifyAccept: false,
+    userEmail: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
@@ -376,6 +377,10 @@ function AddPage() {
 
   const handleSubmit = async () => {
     if (!form.names.trim()) return;
+    if (form.notifyAccept && !form.userEmail.trim()) {
+      setError("Укажите email для уведомления о принятии");
+      return;
+    }
     setSubmitting(true);
     setResult(null);
     setError(null);
@@ -387,18 +392,21 @@ function AddPage() {
           period_type: form.periodType,
           names_text: form.names,
           starts_at: form.startsAt ? `${form.startsAt}T00:00:00` : null,
-          need_receipt: form.needReceipt,
+          need_receipt: form.notifyAccept,
+          user_email: form.notifyAccept ? form.userEmail.trim() || null : null,
         }),
       });
       setResult(data);
       if (data?.order_id) {
-        setForm(f => ({ ...f, names: "", startsAt: "", needReceipt: false }));
+        setForm(f => ({ ...f, names: "", startsAt: "", notifyAccept: false, userEmail: "" }));
       }
     } catch (e) {
       setError(e.message);
     }
     setSubmitting(false);
   };
+
+  const canSubmit = form.names.trim() && (!form.notifyAccept || form.userEmail.trim());
 
   const inputSt = InputStyle();
   const labelSt = LabelStyle();
@@ -461,21 +469,36 @@ function AddPage() {
         style={inputSt}
       />
 
-      {/* Need receipt */}
+      {/* Notify about acceptance */}
       <label style={{
         display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
         marginTop: 12, color: T.dim, fontSize: 12, fontFamily: "'JetBrains Mono', monospace",
       }}>
         <input
           type="checkbox"
-          checked={form.needReceipt}
-          onChange={e => setForm(f => ({ ...f, needReceipt: e.target.checked }))}
+          checked={form.notifyAccept}
+          onChange={e => setForm(f => ({ ...f, notifyAccept: e.target.checked }))}
           style={{ width: 16, height: 16, cursor: "pointer" }}
         />
-        Нужна квитанция
+        Известить о принятии
       </label>
 
-      <button onClick={handleSubmit} disabled={submitting || !form.names.trim()} style={{
+      {form.notifyAccept && (
+        <>
+          <label style={{ ...labelSt, marginTop: 8 }}>
+            Email <span style={{ color: T.red }}>*</span>
+          </label>
+          <input
+            type="email"
+            value={form.userEmail}
+            onChange={e => setForm(f => ({ ...f, userEmail: e.target.value }))}
+            placeholder="example@mail.ru"
+            style={{ ...inputSt, marginTop: 4 }}
+          />
+        </>
+      )}
+
+      <button onClick={handleSubmit} disabled={submitting || !canSubmit} style={{
         width: "100%", padding: 14, borderRadius: 10, border: "none",
         background: T.gold, color: T.bg, fontSize: 15, fontWeight: 700,
         cursor: submitting ? "wait" : "pointer", marginTop: 16,
@@ -729,6 +752,7 @@ function CommemorationManager() {
       starts_at: item.starts_at ? item.starts_at.slice(0, 10) : "",
       expires_at: item.expires_at ? item.expires_at.slice(0, 10) : "",
       prefix: item.prefix || "",
+      suffix: item.suffix || "",
     });
   };
 
@@ -741,9 +765,21 @@ function CommemorationManager() {
           period_type: editValues.period_type || null,
           starts_at: editValues.starts_at ? `${editValues.starts_at}T00:00:00` : null,
           expires_at: editValues.expires_at ? `${editValues.expires_at}T00:00:00` : null,
-          prefix: editValues.prefix || null,
+          prefix: editValues.prefix !== undefined ? (editValues.prefix || null) : undefined,
+          suffix: editValues.suffix !== undefined ? (editValues.suffix || null) : undefined,
         }),
       });
+      setEditingId(null);
+      load();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const handleDeleteCommemoration = async (id) => {
+    if (!confirm("Удалить эту запись (одно имя)?")) return;
+    try {
+      await apiOrThrow(`/commemorations/${id}`, { method: "DELETE" });
       setEditingId(null);
       load();
     } catch (e) {
@@ -814,9 +850,23 @@ function CommemorationManager() {
             }}>
               {editingId === item.id ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                    <span style={{ color: T.dim }}>#{item.id}</span>
-                    <span style={{ color: T.text, fontFamily: "'Cormorant Garamond', serif", fontSize: 14 }}>{item.canonical_name}</span>
+                  <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>Префикс · Имя · Суффикс</div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    <input
+                      placeholder="в., нпр., мл."
+                      value={editValues.prefix}
+                      onChange={e => setEditValues(v => ({ ...v, prefix: e.target.value }))}
+                      style={{ ...inputSt, flex: "1 1 80px", minWidth: 0 }}
+                    />
+                    <span style={{ color: T.text, fontFamily: "'Cormorant Garamond', serif", fontSize: 14, flex: "0 0 auto" }}>
+                      {item.canonical_name}
+                    </span>
+                    <input
+                      placeholder="со чадом"
+                      value={editValues.suffix}
+                      onChange={e => setEditValues(v => ({ ...v, suffix: e.target.value }))}
+                      style={{ ...inputSt, flex: "1 1 80px", minWidth: 0 }}
+                    />
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                     <div>
@@ -856,23 +906,41 @@ function CommemorationManager() {
                         style={{ ...inputSt, width: "100%" }} />
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                    <button onClick={() => setEditingId(null)} style={{
-                      padding: "4px 10px", borderRadius: 5, border: `1px solid ${T.border}`,
-                      background: "transparent", color: T.dim, cursor: "pointer", fontSize: 11,
-                    }}>Отмена</button>
-                    <button onClick={() => saveEdit(item.id)} style={{
-                      padding: "4px 10px", borderRadius: 5, border: "none",
-                      background: T.gold, color: T.bg, cursor: "pointer", fontSize: 11, fontWeight: 700,
-                    }}>Сохранить</button>
+                  <div style={{ display: "flex", gap: 6, justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => setEditingId(null)} style={{
+                        padding: "4px 10px", borderRadius: 5, border: `1px solid ${T.border}`,
+                        background: "transparent", color: T.dim, cursor: "pointer", fontSize: 11,
+                      }}>Отмена</button>
+                      <button onClick={() => saveEdit(item.id)} style={{
+                        padding: "4px 10px", borderRadius: 5, border: "none",
+                        background: T.gold, color: T.bg, cursor: "pointer", fontSize: 11, fontWeight: 700,
+                      }}>Сохранить</button>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteCommemoration(item.id)}
+                      title="Удалить запись"
+                      style={{
+                        padding: 4, borderRadius: 5, border: "none",
+                        background: "transparent", cursor: "pointer",
+                      }}
+                    >
+                      <Icon d={Icons.trash} size={16} color={T.red} />
+                    </button>
                   </div>
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div>
                     <span style={{ color: T.dim, marginRight: 6 }}>#{item.id}</span>
-                    <span style={{ color: T.text, fontFamily: "'Cormorant Garamond', serif", fontSize: 14 }}>
-                      {item.prefix ? `${item.prefix} ` : ""}{item.canonical_name}
+                    <span style={{ color: T.dim, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                      {item.prefix ? item.prefix : "—"}
+                    </span>
+                    <span style={{ color: T.text, fontFamily: "'Cormorant Garamond', serif", fontSize: 14, margin: "0 6px" }}>
+                      {item.canonical_name}
+                    </span>
+                    <span style={{ color: T.dim, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                      {item.suffix ? item.suffix : ""}
                     </span>
                     <div style={{ color: T.dim, fontSize: 10, marginTop: 2 }}>
                       {item.order_type} · {item.period_type}
@@ -880,11 +948,18 @@ function CommemorationManager() {
                       {item.position != null ? ` · #${item.position}` : ""}
                     </div>
                   </div>
-                  <button onClick={() => startEdit(item)} style={{
-                    background: "transparent", border: "none", cursor: "pointer", padding: 4,
-                  }}>
-                    <Icon d={Icons.pencil} size={14} color={T.dim} />
-                  </button>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => startEdit(item)} title="Редактировать" style={{
+                      background: "transparent", border: "none", cursor: "pointer", padding: 4,
+                    }}>
+                      <Icon d={Icons.pencil} size={14} color={T.dim} />
+                    </button>
+                    <button onClick={() => handleDeleteCommemoration(item.id)} title="Удалить запись" style={{
+                      background: "transparent", border: "none", cursor: "pointer", padding: 4,
+                    }}>
+                      <Icon d={Icons.trash} size={14} color={T.red} />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
