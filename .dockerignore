@@ -1,0 +1,50 @@
+# ── Git ───────────────────────────────────────────────────
+.git
+.gitignore
+
+# ── Python artifacts ─────────────────────────────────────
+__pycache__
+*.py[cod]
+*.egg-info
+.venv
+venv
+.eggs
+.mypy_cache
+.pytest_cache
+.coverage
+htmlcov
+
+# ── Node / Frontend source (built assets served by nginx) ─
+node_modules
+frontend/src
+frontend/node_modules
+frontend/.cache
+frontend/package-lock.json
+
+# ── IDE ──────────────────────────────────────────────────
+.idea
+.vscode
+*.swp
+*.swo
+
+# ── Environment & docs ───────────────────────────────────
+.env
+.env.*
+README.md
+LICENSE
+*.md
+
+# ── Docker ───────────────────────────────────────────────
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
+.dockerignore
+
+# ── ML model cache (will be downloaded at runtime) ───────
+.cache
+models
+
+# ── Misc ─────────────────────────────────────────────────
+*.log
+logs
+.DS_Store
