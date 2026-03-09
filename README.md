@@ -4,15 +4,10 @@
 
 ## Архитектура
 
-```
-┌─────────────┐     ┌──────────────┐     ┌────────────────────┐
-│  PWA (React) │────▶│  FastAPI API  │────▶│  PostgreSQL 18     │
-│  Mobile-first│     │  Python 3.12  │     │  + pgvector        │
-│  + CSV upload│     │  + NLP parser │     │  + pg_trgm         │
-└─────────────┘     └──────────────┘     └────────────────────┘
-        │                   │
-        │   Nginx :80       │   uvicorn :8000
-        └───────────────────┘
+```mermaid
+graph LR
+    A["PWA (React)<br/>Mobile-first<br/>+ CSV upload"] -->|Nginx :80| B["FastAPI API<br/>Python 3.12<br/>+ NLP parser"]
+    B -->|uvicorn :8000| C["PostgreSQL 18<br/>+ pgvector<br/>+ pg_trgm"]
 ```
 
 ## Быстрый старт
@@ -164,8 +159,12 @@ Two-pass pipeline обработки текстового поля:
 | `SINODIK_DATABASE_URL` | `postgresql+asyncpg://sinodik:sinodik@localhost:5432/sinodik` | Async DB URL |
 | `SINODIK_DATABASE_URL_SYNC` | `postgresql://sinodik:sinodik@localhost:5432/sinodik` | Sync DB URL (Alembic) |
 | `SINODIK_CORS_ORIGINS` | `["http://localhost:5173","http://localhost:3000"]` | CORS origins |
-| `SINODIK_ANTHROPIC_API_KEY` | — | API ключ для LLM fallback |
-| `SINODIK_EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Модель sentence-transformers |
+| `SINODIK_OPENAI_BASE_URL` | — | Base URL OpenAI-совместимого LLM API |
+| `SINODIK_OPENAI_MODEL` | — | Модель LLM (например `gpt-4o-mini`) |
+| `SINODIK_OPENAI_API_KEY` | — | API ключ для LLM |
+| `SINODIK_EMBEDDING_URL` | — | Base URL OpenAI-совместимого Embedding API |
+| `SINODIK_EMBEDDING_MODEL` | — | Модель эмбеддингов (например `text-embedding-3-small`) |
+| `SINODIK_EMBEDDING_API_KEY` | — | API ключ для эмбеддингов |
 | `SINODIK_EMBEDDING_DIM` | `384` | Размерность эмбеддингов |
 | `SINODIK_DEDUP_THRESHOLD` | `0.85` | Порог дедупликации по вектору |
 

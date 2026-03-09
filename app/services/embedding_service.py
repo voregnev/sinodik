@@ -1,37 +1,42 @@
 """
-Sentence-transformers embedding service.
+OpenAI-compatible embedding service.
 
-Lazy-loads the model on first call to avoid slow startup
-when embeddings aren't needed.
+Calls a remote embedding API. Disabled when embedding_url is not configured.
 """
 
 import logging
 
+import httpx
+
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
-_model = None
+
+def _is_configured() -> bool:
+    return bool(settings.embedding_url and settings.embedding_model)
 
 
-def _get_model():
-    global _model
-    if _model is None:
-        try:
-            from sentence_transformers import SentenceTransformer
-            from app.config import settings
-            _model = SentenceTransformer(settings.embedding_model)
-            logger.info(f"Loaded embedding model: {settings.embedding_model}")
-        except Exception as e:
-            logger.warning(f"Could not load embedding model: {e}")
-    return _model
-
-
-def embed_name(name: str) -> list[float] | None:
-    """Return embedding vector for a name, or None if model unavailable."""
-    model = _get_model()
-    if model is None:
+async def embed_name_async(name: str) -> list[float] | None:
+    """Return embedding vector for a name via OpenAI-compatible API, or None if unavailable."""
+    if not _is_configured():
         return None
     try:
-        return model.encode(name).tolist()
+        headers = {"Content-Type": "application/json"}
+        if settings.embedding_api_key:
+            headers["Authorization"] = f"Bearer {settings.embedding_api_key}"
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{settings.embedding_url}/embeddings",
+                headers=headers,
+                json={"model": settings.embedding_model, "input": name},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["data"][0]["embedding"]
     except Exception as e:
         logger.warning(f"Embedding failed for '{name}': {e}")
         return None
+
+

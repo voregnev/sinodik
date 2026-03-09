@@ -1,9 +1,11 @@
 """
-LLM fallback: Claude Haiku for names that the regex pipeline couldn't parse.
+LLM fallback: OpenAI-compatible API for names that the regex pipeline couldn't parse.
 """
 
 import json
 import logging
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -16,30 +18,37 @@ _SYSTEM_PROMPT = (
 )
 
 
+def _is_configured() -> bool:
+    return bool(settings.openai_base_url and settings.openai_model and settings.openai_api_key)
+
+
 async def llm_parse_names(text: str):
     """
-    Parse names using Claude Haiku as a fallback.
+    Parse names using an OpenAI-compatible API as a fallback.
 
     Returns list[ParsedName] or None if LLM is unavailable.
-    Import ParsedName lazily to avoid circular imports.
     """
+    if not _is_configured():
+        return None
+
     try:
-        from anthropic import AsyncAnthropic
-        from app.config import settings
+        from openai import AsyncOpenAI
 
-        if not settings.anthropic_api_key:
-            return None
-
-        client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-
-        response = await client.messages.create(
-            model="claude-3-5-haiku-latest",
-            max_tokens=1024,
-            system=_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": text}],
+        client = AsyncOpenAI(
+            base_url=settings.openai_base_url,
+            api_key=settings.openai_api_key,
         )
 
-        data = json.loads(response.content[0].text)
+        response = await client.chat.completions.create(
+            model=settings.openai_model,
+            max_tokens=1024,
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": text},
+            ],
+        )
+
+        data = json.loads(response.choices[0].message.content)
 
         from app.nlp.name_extractor import ParsedName
         return [

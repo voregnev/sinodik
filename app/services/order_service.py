@@ -25,7 +25,7 @@ from app.services.period_calculator import (
     normalize_period_type,
     normalize_order_type,
 )
-from app.services.embedding_service import embed_name
+from app.services.embedding_service import embed_name_async
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ async def find_or_create_person(
         pass
 
     # 3. Vector similarity
-    embedding = embed_name(canonical)
+    embedding = await embed_name_async(canonical)
     if embedding:
         try:
             result = await db.execute(

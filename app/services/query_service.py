@@ -14,7 +14,7 @@ from sqlalchemy import select, func, text, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Person, Order, Commemoration
-from app.services.embedding_service import embed_name
+from app.services.embedding_service import embed_name_async
 
 
 # ═══════════════════════════════════════════════════════════
@@ -126,7 +126,7 @@ async def search_names(
         pass
 
     # 2. Vector
-    embedding = embed_name(query)
+    embedding = await embed_name_async(query)
     if embedding:
         try:
             result = await db.execute(
