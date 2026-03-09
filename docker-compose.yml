@@ -42,6 +42,8 @@ services:
   ollama-init:
     image: ollama/ollama
     container_name: sinodik-ollama-init
+    profiles:
+      - init
     depends_on:
       ollama:
         condition: service_healthy

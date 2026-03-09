@@ -6,15 +6,18 @@ Main queries:
   - search_names()        — fuzzy-поиск по справочнику имён
   - get_stats()           — дашборд статистика
   - get_by_user()         — все заказы конкретного пользователя
+  - get_commemorations()  — список поминовений для управления БД
+  - bulk_set_starts_at()  — массовая установка даты начала
 """
 
 from datetime import date, datetime
 
-from sqlalchemy import select, func, text, and_
+from sqlalchemy import select, func, text, and_, case, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Person, Order, Commemoration
 from app.services.embedding_service import embed_name_async
+from app.services.period_calculator import calculate_expires_at
 
 
 # ═══════════════════════════════════════════════════════════
@@ -29,13 +32,28 @@ async def get_active_today(
     """
     Все активные поминовения на указанную дату.
 
-    Каждая запись = один Commemoration = одно имя.
-    Группировка по order_type на стороне клиента.
+    Сортировка: тип (здравие → упокоение) → период (год→полгода→сорокоуст→разовое)
+               → дата заказа ASC → позиция ASC.
+
+    Записи с NULL starts_at или expires_at исключаются (ещё не начались).
     """
     if target_date is None:
         target_date = date.today()
 
     target_dt = datetime.combine(target_date, datetime.min.time())
+
+    type_order = case(
+        (Commemoration.order_type == "здравие", 1),
+        (Commemoration.order_type == "упокоение", 2),
+        else_=3,
+    )
+    period_order = case(
+        (Commemoration.period_type == "год", 1),
+        (Commemoration.period_type == "полгода", 2),
+        (Commemoration.period_type == "сорокоуст", 3),
+        (Commemoration.period_type == "разовое", 4),
+        else_=5,
+    )
 
     stmt = (
         select(
@@ -43,12 +61,15 @@ async def get_active_today(
             Commemoration.order_type,
             Commemoration.period_type,
             Commemoration.prefix,
+            Commemoration.suffix,
             Commemoration.ordered_at,
             Commemoration.starts_at,
             Commemoration.expires_at,
             Commemoration.is_active,
+            Commemoration.position,
             Person.id.label("person_id"),
             Person.canonical_name,
+            Person.genitive_name,
             Order.user_email,
         )
         .join(Person, Person.id == Commemoration.person_id)
@@ -56,11 +77,18 @@ async def get_active_today(
         .where(
             and_(
                 Commemoration.is_active == True,
+                Commemoration.starts_at.isnot(None),
+                Commemoration.expires_at.isnot(None),
                 Commemoration.starts_at <= target_dt,
                 Commemoration.expires_at >= target_dt,
             )
         )
-        .order_by(Commemoration.order_type, Person.canonical_name)
+        .order_by(
+            type_order,
+            period_order,
+            Commemoration.ordered_at.asc(),
+            Commemoration.position.asc().nulls_last(),
+        )
     )
 
     if order_type:
@@ -73,13 +101,16 @@ async def get_active_today(
             "commemoration_id": r.id,
             "person_id": r.person_id,
             "canonical_name": r.canonical_name,
+            "genitive_name": r.genitive_name or r.canonical_name,
             "prefix": r.prefix,
+            "suffix": r.suffix,
             "order_type": r.order_type,
             "period_type": r.period_type,
             "ordered_at": r.ordered_at.isoformat() if r.ordered_at else None,
             "starts_at": r.starts_at.isoformat() if r.starts_at else None,
             "expires_at": r.expires_at.isoformat() if r.expires_at else None,
             "user_email": r.user_email,
+            "position": r.position,
         }
         for r in result.all()
     ]
@@ -188,6 +219,8 @@ async def get_stats(db: AsyncSession) -> dict:
         select(func.count(Commemoration.id)).where(
             and_(
                 Commemoration.is_active == True,
+                Commemoration.starts_at.isnot(None),
+                Commemoration.expires_at.isnot(None),
                 Commemoration.starts_at <= today_dt,
                 Commemoration.expires_at >= today_dt,
             )
@@ -200,6 +233,7 @@ async def get_stats(db: AsyncSession) -> dict:
         .where(
             and_(
                 Commemoration.is_active == True,
+                Commemoration.expires_at.isnot(None),
                 Commemoration.expires_at >= today_dt,
             )
         )
@@ -213,6 +247,7 @@ async def get_stats(db: AsyncSession) -> dict:
         .where(
             and_(
                 Commemoration.is_active == True,
+                Commemoration.expires_at.isnot(None),
                 Commemoration.expires_at >= today_dt,
             )
         )
@@ -264,6 +299,7 @@ async def get_by_user(
         stmt = stmt.where(
             and_(
                 Commemoration.is_active == True,
+                Commemoration.expires_at.isnot(None),
                 Commemoration.expires_at >= today_dt,
             )
         )
@@ -277,10 +313,110 @@ async def get_by_user(
             "prefix": r.prefix,
             "order_type": r.order_type,
             "period_type": r.period_type,
-            "ordered_at": r.ordered_at.isoformat(),
-            "starts_at": r.starts_at.isoformat(),
-            "expires_at": r.expires_at.isoformat(),
+            "ordered_at": r.ordered_at.isoformat() if r.ordered_at else None,
+            "starts_at": r.starts_at.isoformat() if r.starts_at else None,
+            "expires_at": r.expires_at.isoformat() if r.expires_at else None,
             "is_active": r.is_active,
         }
         for r in result.all()
     ]
+
+
+# ═══════════════════════════════════════════════════════════
+#  DB MANAGEMENT: list commemorations
+# ═══════════════════════════════════════════════════════════
+
+async def get_commemorations(
+    db: AsyncSession,
+    no_start_date: bool = False,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[dict]:
+    """
+    Список поминовений для управления БД.
+
+    Если no_start_date=True — только записи без даты начала (starts_at IS NULL).
+    """
+    stmt = (
+        select(
+            Commemoration.id,
+            Commemoration.order_type,
+            Commemoration.period_type,
+            Commemoration.prefix,
+            Commemoration.suffix,
+            Commemoration.ordered_at,
+            Commemoration.starts_at,
+            Commemoration.expires_at,
+            Commemoration.is_active,
+            Commemoration.position,
+            Commemoration.order_id,
+            Person.id.label("person_id"),
+            Person.canonical_name,
+            Order.user_email,
+            Order.need_receipt,
+        )
+        .join(Person, Person.id == Commemoration.person_id)
+        .outerjoin(Order, Order.id == Commemoration.order_id)
+        .order_by(Commemoration.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+
+    if no_start_date:
+        stmt = stmt.where(Commemoration.starts_at.is_(None))
+
+    result = await db.execute(stmt)
+
+    return [
+        {
+            "id": r.id,
+            "person_id": r.person_id,
+            "canonical_name": r.canonical_name,
+            "order_id": r.order_id,
+            "order_type": r.order_type,
+            "period_type": r.period_type,
+            "prefix": r.prefix,
+            "ordered_at": r.ordered_at.isoformat() if r.ordered_at else None,
+            "starts_at": r.starts_at.isoformat() if r.starts_at else None,
+            "expires_at": r.expires_at.isoformat() if r.expires_at else None,
+            "is_active": r.is_active,
+            "position": r.position,
+            "suffix": r.suffix,
+            "user_email": r.user_email,
+            "need_receipt": r.need_receipt,
+        }
+        for r in result.all()
+    ]
+
+
+# ═══════════════════════════════════════════════════════════
+#  DB MANAGEMENT: bulk set starts_at
+# ═══════════════════════════════════════════════════════════
+
+async def bulk_set_starts_at(
+    db: AsyncSession,
+    ids: list[int],
+    starts_at: datetime,
+) -> int:
+    """
+    Массовая установка starts_at для списка поминовений.
+
+    expires_at пересчитывается индивидуально по period_type каждой записи.
+    Возвращает количество обновлённых записей.
+    """
+    if not ids:
+        return 0
+
+    result = await db.execute(
+        select(Commemoration).where(Commemoration.id.in_(ids))
+    )
+    comms = result.scalars().all()
+
+    count = 0
+    for comm in comms:
+        comm.starts_at = starts_at
+        comm.expires_at = calculate_expires_at(starts_at, comm.period_type)
+        count += 1
+
+    await db.commit()
+    return count

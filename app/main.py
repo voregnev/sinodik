@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import engine, Base
-from app.api.routes import upload, orders, names, health
+from app.api.routes import upload, orders, names, health, commemorations
 
 
 @asynccontextmanager
@@ -49,3 +49,4 @@ app.include_router(health.router, tags=["health"])
 app.include_router(upload.router, prefix="/api/v1", tags=["upload"])
 app.include_router(orders.router, prefix="/api/v1", tags=["orders"])
 app.include_router(names.router, prefix="/api/v1", tags=["names"])
+app.include_router(commemorations.router, prefix="/api/v1", tags=["commemorations"])

@@ -10,7 +10,7 @@ RUN sed -i 's/deb.debian.org/ftp.ru.debian.org/g' /etc/apt/sources.list.d/*.sour
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir install -r requirements.txt
 
 
 # ── Runtime stage ────────────────────────────────────────

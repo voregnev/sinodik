@@ -11,6 +11,7 @@ Flow:
                      create Commemoration (атомарная единица)
 """
 
+import hashlib
 import logging
 from datetime import datetime
 
@@ -30,6 +31,14 @@ from app.services.embedding_service import embed_name_async
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+# ─── Dedup helpers ──────────────────────────────────────────────────
+
+def _make_external_id(date_str: str, content: str) -> str:
+    """Deterministic hash for deduplication: sha256(date|content)[:64]."""
+    payload = f"{date_str}|{content.strip()}"
+    return hashlib.sha256(payload.encode()).hexdigest()[:64]
 
 
 # ─── Person deduplication ───────────────────────────────────────────
@@ -132,21 +141,34 @@ async def find_or_create_person(
 async def process_row(
     db: AsyncSession,
     row: CsvRow,
+    starts_at_override: datetime | None = None,
 ) -> list[Commemoration]:
     """
     Обработка одной строки CSV.
 
     Одна строка → один Order + N Commemoration (по числу имён).
     Каждый Commemoration = одно имя с полным набором дат.
+
+    Raises ValueError if:
+      - order_type or names_raw is empty
+      - no valid names found in names_raw
     """
-    # Dedup заказов по external_id
-    if row.external_id:
-        existing = await db.execute(
-            select(Order).where(Order.external_id == row.external_id)
-        )
-        if existing.scalar_one_or_none():
-            logger.debug(f"Order {row.external_id} already exists — skip")
-            return []
+    # ── Validation (before any DB writes) ──
+    if not row.order_type or not row.order_type.strip():
+        raise ValueError("order_type is required")
+    if not row.names_raw or not row.names_raw.strip():
+        raise ValueError("names_raw is required")
+
+    # ── Dedup by external_id (use hash if not provided) ──
+    ext_id = row.external_id or _make_external_id(
+        row.date.strftime("%Y-%m-%d"), row.names_raw
+    )
+    existing = await db.execute(
+        select(Order).where(Order.external_id == ext_id)
+    )
+    if existing.scalar_one_or_none():
+        logger.debug(f"Order {ext_id} already exists — skip")
+        return []
 
     # ── Нормализация ──
     order_type = normalize_order_type(row.order_type)
@@ -154,10 +176,10 @@ async def process_row(
 
     # ── Даты ──
     ordered_at = row.date
-    starts_at = ordered_at                              # пока starts_at = ordered_at
-    expires_at = calculate_expires_at(starts_at, period_type)
+    starts_at = starts_at_override  # None = не назначено
+    expires_at = calculate_expires_at(starts_at, period_type) if starts_at else None
 
-    # ── Извлечение имён ──
+    # ── Извлечение имён (до создания Order, чтобы не создавать "пустые" записи) ──
     names = extract_names(row.names_raw)
 
     if row.names_raw and (not names or any(n.confidence < 0.5 for n in names)):
@@ -165,12 +187,15 @@ async def process_row(
         if llm_names:
             names = llm_names
 
+    if not names:
+        raise ValueError(f"No valid names found in: {row.names_raw!r}")
+
     # ── Создание Order (метаданные) ──
     order = Order(
         user_email=row.email,
         source_channel="csv",
         source_raw=row.names_raw,
-        external_id=row.external_id,
+        external_id=ext_id,
     )
     db.add(order)
     await db.flush()
@@ -178,7 +203,7 @@ async def process_row(
     # ── Создание Commemoration для каждого имени ──
     commemorations: list[Commemoration] = []
 
-    for parsed_name in names:
+    for idx, parsed_name in enumerate(names, start=1):
         person = await find_or_create_person(db, parsed_name)
 
         comm = Commemoration(
@@ -187,10 +212,12 @@ async def process_row(
             order_type=order_type,
             period_type=period_type,
             prefix=parsed_name.prefix,
+            suffix=parsed_name.suffix,
             ordered_at=ordered_at,
             starts_at=starts_at,
             expires_at=expires_at,
             is_active=True,
+            position=idx,
         )
         db.add(comm)
         commemorations.append(comm)
@@ -204,26 +231,28 @@ async def process_csv_upload(
     db: AsyncSession,
     content: bytes,
     delimiter: str = ";",
+    starts_at: datetime | None = None,
 ) -> dict:
     """
     Полный pipeline импорта CSV.
 
     Returns:
         {total_rows, orders_created, commemorations_created, skipped, errors}
+        errors is now a list[str] with per-row error messages.
     """
     rows = parse_csv(content, delimiter=delimiter)
 
-    stats = {
+    stats: dict = {
         "total_rows": len(rows),
         "orders_created": 0,
         "commemorations_created": 0,
         "skipped": 0,
-        "errors": 0,
+        "errors": [],
     }
 
     for row in rows:
         try:
-            comms = await process_row(db, row)
+            comms = await process_row(db, row, starts_at_override=starts_at)
             if comms:
                 stats["orders_created"] += 1
                 stats["commemorations_created"] += len(comms)
@@ -231,7 +260,7 @@ async def process_csv_upload(
                 stats["skipped"] += 1
         except Exception as e:
             logger.error(f"Error processing row: {e}")
-            stats["errors"] += 1
+            stats["errors"].append(str(e))
             await db.rollback()
             continue
 
@@ -252,35 +281,53 @@ async def create_manual_order(
     user_email: str | None = None,
     ordered_at: datetime | None = None,
     starts_at: datetime | None = None,
+    need_receipt: bool = False,
 ) -> list[Commemoration]:
     """
     Создание заказа из формы (ручной ввод).
 
     Returns: list of created Commemoration records.
+    Raises ValueError if order_type/names_text is empty or no names found.
     """
+    # ── Validation ──
+    if not order_type or not order_type.strip():
+        raise ValueError("order_type is required")
+    if not names_text or not names_text.strip():
+        raise ValueError("names_text is required")
+
     if ordered_at is None:
         ordered_at = datetime.utcnow()
-    if starts_at is None:
-        starts_at = ordered_at
 
     otype = normalize_order_type(order_type)
     ptype = normalize_period_type(period_type_raw)
-    exp = calculate_expires_at(starts_at, ptype)
+    # starts_at stays None if not provided — means "not yet started"
+    exp = calculate_expires_at(starts_at, ptype) if starts_at else None
 
+    # ── Extract names before creating Order ──
     names = extract_names(names_text)
+    if not names:
+        raise ValueError(f"No valid names found in: {names_text!r}")
 
-    # Order (метаданные)
+    # ── Dedup by hash ──
+    ext_id = _make_external_id(ordered_at.isoformat(), names_text)
+    existing = await db.execute(select(Order).where(Order.external_id == ext_id))
+    if existing.scalar_one_or_none():
+        raise ValueError("Duplicate order: identical content already submitted")
+
+    # ── Order (метаданные) ──
     order = Order(
         user_email=user_email,
         source_channel="form",
         source_raw=names_text,
+        external_id=ext_id,
+        need_receipt=need_receipt,
     )
     db.add(order)
     await db.flush()
 
-    # Commemorations
+    # ── Commemorations ──
     commemorations: list[Commemoration] = []
-    for parsed_name in names:
+    for idx, parsed_name in enumerate(names, start=1):
         person = await find_or_create_person(db, parsed_name)
 
         comm = Commemoration(
@@ -289,10 +336,12 @@ async def create_manual_order(
             order_type=otype,
             period_type=ptype,
             prefix=parsed_name.prefix,
+            suffix=parsed_name.suffix,
             ordered_at=ordered_at,
             starts_at=starts_at,
             expires_at=exp,
             is_active=True,
+            position=idx,
         )
         db.add(comm)
         commemorations.append(comm)

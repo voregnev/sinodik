@@ -1,5 +1,11 @@
 """Alembic migration environment."""
 
+import sys
+from pathlib import Path
+
+# Ensure project root is on path when running from container or CLI
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool

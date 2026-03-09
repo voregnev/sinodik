@@ -36,9 +36,13 @@ const Icons = {
   check: "M20 6L9 17l-5-5",
   x: "M18 6L6 18M6 6l12 12",
   bar: "M18 20V10M12 20V4M6 20v-6",
+  db: "M12 2C7.03 2 3 3.34 3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5c0-1.66-4.03-3-9-3zM3 12c0 1.66 4.03 3 9 3s9-1.34 9-3M3 8c0 1.66 4.03 3 9 3s9-1.34 9-3",
+  pencil: "M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z",
+  trash: "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6",
+  save: "M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8",
 };
 
-// ─── Fetch helper ─────────────────────────────────────────
+// ─── Fetch helper (returns null on error) ─────────────────
 async function api(path, opts = {}) {
   try {
     const res = await fetch(`${API}${path}`, {
@@ -53,7 +57,21 @@ async function api(path, opts = {}) {
   }
 }
 
-// ─── Components ───────────────────────────────────────────
+// Like api() but throws on error (returns detail from body when available)
+async function apiOrThrow(path, opts = {}) {
+  const res = await fetch(`${API}${path}`, {
+    headers: { "Content-Type": "application/json", ...opts.headers },
+    ...opts,
+  });
+  if (!res.ok) {
+    let detail = `${res.status}: ${res.statusText}`;
+    try { const b = await res.json(); if (b.detail) detail = b.detail; } catch {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+// ─── Shared UI primitives ─────────────────────────────────
 
 function Badge({ children, color = T.gold }) {
   return (
@@ -81,11 +99,13 @@ function Tab({ active, label, icon, onClick }) {
   );
 }
 
-function NameCard({ name, prefix, orderType, periodType, expiresAt }) {
+function NameCard({ name, genitiveName, prefix, suffix, orderType, periodType, expiresAt, position }) {
   const isHealth = orderType === "здравие";
   const color = isHealth ? T.green : T.red;
   const exp = expiresAt ? new Date(expiresAt) : null;
   const daysLeft = exp ? Math.max(0, Math.ceil((exp - new Date()) / 86400000)) : 0;
+  // Show genitive if available, otherwise fall back to nominative
+  const displayName = genitiveName || name;
 
   return (
     <div style={{
@@ -95,8 +115,14 @@ function NameCard({ name, prefix, orderType, periodType, expiresAt }) {
     }}>
       <div>
         <div style={{ color: T.text, fontSize: 15, fontWeight: 600, fontFamily: "'Cormorant Garamond', serif" }}>
-          {prefix && <span style={{ color: T.dim, fontSize: 12, fontStyle: "italic", marginRight: 6 }}>{prefix}</span>}
-          {name}
+          {prefix && <span style={{ color: T.dim, fontSize: 12, fontStyle: "italic", marginRight: 5 }}>{prefix}</span>}
+          {displayName}
+          {suffix && <span style={{ color: T.dim, fontSize: 12, fontStyle: "italic", marginLeft: 5 }}>{suffix}</span>}
+          {position != null && (
+            <span style={{ color: T.dim, fontSize: 10, marginLeft: 6, fontFamily: "'JetBrains Mono', monospace" }}>
+              #{position}
+            </span>
+          )}
         </div>
         {periodType && (
           <div style={{ color: T.dim, fontSize: 11, marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
@@ -109,7 +135,31 @@ function NameCard({ name, prefix, orderType, periodType, expiresAt }) {
   );
 }
 
+function InputStyle() {
+  return {
+    width: "100%", padding: "10px 12px", borderRadius: 8,
+    border: `1px solid ${T.border}`, background: T.card,
+    color: T.text, fontSize: 13, outline: "none",
+    boxSizing: "border-box", fontFamily: "'JetBrains Mono', monospace",
+  };
+}
+
+function LabelStyle() {
+  return {
+    color: T.dim, fontSize: 11, fontFamily: "'JetBrains Mono', monospace",
+    display: "block", marginBottom: 6,
+  };
+}
+
 // ─── Pages ────────────────────────────────────────────────
+
+const PERIOD_ORDER = ["год", "полгода", "сорокоуст", "разовое"];
+const PERIOD_LABELS = {
+  "год": "Год",
+  "полгода": "Полгода",
+  "сорокоуст": "Сорокоуст (40 дней)",
+  "разовое": "Разовое",
+};
 
 function TodayPage() {
   const [data, setData] = useState(null);
@@ -128,9 +178,23 @@ function TodayPage() {
   const healthNames = groups["здравие"] || [];
   const restNames = groups["упокоение"] || [];
 
-  const shown = filter === "all"
-    ? [...healthNames, ...restNames]
-    : filter === "здравие" ? healthNames : restNames;
+  const sections =
+    filter === "all"
+      ? [{ key: "здравие", names: healthNames }, { key: "упокоение", names: restNames }]
+      : filter === "здравие"
+        ? [{ key: "здравие", names: healthNames }]
+        : [{ key: "упокоение", names: restNames }];
+
+  // Group a flat list by period
+  function byPeriod(names) {
+    const map = {};
+    for (const n of names) {
+      const p = n.period_type || "разовое";
+      if (!map[p]) map[p] = [];
+      map[p].push(n);
+    }
+    return map;
+  }
 
   return (
     <div>
@@ -161,21 +225,62 @@ function TodayPage() {
         ))}
       </div>
 
-      {/* Names list */}
+      {/* Names grouped: type → period */}
       <div style={{ padding: "8px 16px" }}>
-        {shown.length === 0 ? (
+        {data.total === 0 ? (
           <Empty msg="Нет активных записок на сегодня" />
         ) : (
-          shown.map((n, i) => (
-            <NameCard
-              key={`${n.person_id}-${n.order_id}-${i}`}
-              name={n.canonical_name}
-              prefix={n.prefix}
-              orderType={n.order_type}
-              periodType={n.period_type}
-              expiresAt={n.expires_at}
-            />
-          ))
+          sections.map(({ key, names }) => {
+            if (!names.length) return null;
+            const periodMap = byPeriod(names);
+            const isHealth = key === "здравие";
+            const typeColor = isHealth ? T.green : T.red;
+            const typeLabel = isHealth ? "О здравии" : "Об упокоении";
+
+            return (
+              <div key={key} style={{ marginBottom: 20 }}>
+                {filter === "all" && (
+                  <div style={{
+                    color: typeColor, fontSize: 13, fontWeight: 700,
+                    fontFamily: "'Cormorant Garamond', serif",
+                    borderBottom: `1px solid ${typeColor}33`,
+                    paddingBottom: 4, marginBottom: 10,
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}>
+                    {typeLabel} <Badge color={typeColor}>{names.length}</Badge>
+                  </div>
+                )}
+                {PERIOD_ORDER.map(period => {
+                  const pNames = periodMap[period];
+                  if (!pNames || !pNames.length) return null;
+                  return (
+                    <div key={period} style={{ marginBottom: 12 }}>
+                      <div style={{
+                        color: T.dim, fontSize: 10, fontFamily: "'JetBrains Mono', monospace",
+                        textTransform: "uppercase", letterSpacing: 1,
+                        marginBottom: 6,
+                      }}>
+                        {PERIOD_LABELS[period] || period}
+                      </div>
+                      {pNames.map((n, i) => (
+                        <NameCard
+                          key={`${n.commemoration_id}-${i}`}
+                          name={n.canonical_name}
+                          genitiveName={n.genitive_name}
+                          prefix={n.prefix}
+                          suffix={n.suffix}
+                          orderType={n.order_type}
+                          periodType={null}
+                          expiresAt={n.expires_at}
+                          position={n.position}
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })
         )}
       </div>
     </div>
@@ -244,7 +349,6 @@ function SearchPage() {
           }}>
             <div>
               <div style={{ color: T.text, fontSize: 15, fontWeight: 600, fontFamily: "'Cormorant Garamond', serif" }}>
-                {r.prefix && <span style={{ color: T.dim, fontSize: 12, fontStyle: "italic", marginRight: 6 }}>{r.prefix}</span>}
                 {r.canonical_name}
               </div>
               <div style={{ color: T.dim, fontSize: 10, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
@@ -263,28 +367,41 @@ function AddPage() {
     orderType: "О здравии",
     periodType: "Сорокоуст (40 дней)",
     names: "",
+    startsAt: "",
+    needReceipt: false,
   });
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
 
   const handleSubmit = async () => {
     if (!form.names.trim()) return;
     setSubmitting(true);
     setResult(null);
-    const data = await api("/orders", {
-      method: "POST",
-      body: JSON.stringify({
-        order_type: form.orderType,
-        period_type: form.periodType,
-        names_text: form.names,
-      }),
-    });
-    setResult(data);
-    setSubmitting(false);
-    if (data?.order_id) {
-      setForm(f => ({ ...f, names: "" }));
+    setError(null);
+    try {
+      const data = await apiOrThrow("/orders", {
+        method: "POST",
+        body: JSON.stringify({
+          order_type: form.orderType,
+          period_type: form.periodType,
+          names_text: form.names,
+          starts_at: form.startsAt ? `${form.startsAt}T00:00:00` : null,
+          need_receipt: form.needReceipt,
+        }),
+      });
+      setResult(data);
+      if (data?.order_id) {
+        setForm(f => ({ ...f, names: "", startsAt: "", needReceipt: false }));
+      }
+    } catch (e) {
+      setError(e.message);
     }
+    setSubmitting(false);
   };
+
+  const inputSt = InputStyle();
+  const labelSt = LabelStyle();
 
   return (
     <div style={{ padding: 16 }}>
@@ -293,9 +410,7 @@ function AddPage() {
       </h2>
 
       {/* Order type */}
-      <label style={{ color: T.dim, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", display: "block", marginBottom: 6 }}>
-        Тип записки
-      </label>
+      <label style={labelSt}>Тип записки</label>
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         {["О здравии", "Об упокоении"].map(t => (
           <button key={t} onClick={() => setForm(f => ({ ...f, orderType: t }))} style={{
@@ -312,9 +427,7 @@ function AddPage() {
       </div>
 
       {/* Period */}
-      <label style={{ color: T.dim, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", display: "block", marginBottom: 6 }}>
-        Срок поминовения
-      </label>
+      <label style={labelSt}>Срок поминовения</label>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
         {["Разовое (не выбрано)", "Сорокоуст (40 дней)", "На полгода", "На год"].map(p => (
           <button key={p} onClick={() => setForm(f => ({ ...f, periodType: p }))} style={{
@@ -327,20 +440,40 @@ function AddPage() {
       </div>
 
       {/* Names textarea */}
-      <label style={{ color: T.dim, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", display: "block", marginBottom: 6 }}>
-        Имена (через запятую, пробел или перенос строки)
-      </label>
+      <label style={labelSt}>Имена (через запятую, пробел или перенос строки)</label>
       <textarea
         value={form.names}
         onChange={e => setForm(f => ({ ...f, names: e.target.value }))}
         placeholder="Николая, Тамары, Ксении..."
         rows={4}
         style={{
-          width: "100%", padding: 12, borderRadius: 8, border: `1px solid ${T.border}`,
-          background: T.card, color: T.text, fontSize: 15, resize: "vertical",
-          fontFamily: "'Cormorant Garamond', serif", outline: "none", boxSizing: "border-box",
+          ...inputSt, resize: "vertical",
+          fontFamily: "'Cormorant Garamond', serif", fontSize: 15,
         }}
       />
+
+      {/* Start date */}
+      <label style={{ ...labelSt, marginTop: 12 }}>Дата начала (необязательно)</label>
+      <input
+        type="date"
+        value={form.startsAt}
+        onChange={e => setForm(f => ({ ...f, startsAt: e.target.value }))}
+        style={inputSt}
+      />
+
+      {/* Need receipt */}
+      <label style={{
+        display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+        marginTop: 12, color: T.dim, fontSize: 12, fontFamily: "'JetBrains Mono', monospace",
+      }}>
+        <input
+          type="checkbox"
+          checked={form.needReceipt}
+          onChange={e => setForm(f => ({ ...f, needReceipt: e.target.checked }))}
+          style={{ width: 16, height: 16, cursor: "pointer" }}
+        />
+        Нужна квитанция
+      </label>
 
       <button onClick={handleSubmit} disabled={submitting || !form.names.trim()} style={{
         width: "100%", padding: 14, borderRadius: 10, border: "none",
@@ -351,13 +484,23 @@ function AddPage() {
         {submitting ? "Сохранение..." : "Подать записку"}
       </button>
 
+      {error && (
+        <div style={{
+          marginTop: 12, padding: 12, borderRadius: 8,
+          background: T.red + "15", border: `1px solid ${T.red}44`,
+          color: T.red, fontSize: 13, fontFamily: "'JetBrains Mono', monospace",
+        }}>
+          ✗ {error}
+        </div>
+      )}
+
       {result && result.order_id && (
         <div style={{
           marginTop: 16, padding: 14, borderRadius: 8,
           background: T.green + "15", border: `1px solid ${T.green}44`,
           color: T.green, fontSize: 13, fontFamily: "'JetBrains Mono', monospace",
         }}>
-          ✓ Записка #{result.order_id} создана · {result.order_type} · {result.period_type} · до {result.expires_at?.split("T")[0]}
+          ✓ Записка #{result.order_id} создана · {result.commemorations_created} имён
         </div>
       )}
     </div>
@@ -366,23 +509,26 @@ function AddPage() {
 
 function UploadPage() {
   const [file, setFile] = useState(null);
+  const [startsAt, setStartsAt] = useState("");
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState(null);
+  const [showErrors, setShowErrors] = useState(false);
   const fileRef = useRef(null);
 
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
     setResult(null);
+    setShowErrors(false);
 
     const formData = new FormData();
     formData.append("file", file);
 
+    let url = `${API}/upload/csv?delimiter=;`;
+    if (startsAt) url += `&starts_at=${startsAt}T00:00:00`;
+
     try {
-      const res = await fetch(`${API}/upload/csv?delimiter=;`, {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch(url, { method: "POST", body: formData });
       const data = await res.json();
       setResult(data);
     } catch (e) {
@@ -390,6 +536,8 @@ function UploadPage() {
     }
     setUploading(false);
   };
+
+  const inputSt = InputStyle();
 
   return (
     <div style={{ padding: 16 }}>
@@ -416,6 +564,15 @@ function UploadPage() {
           onChange={e => setFile(e.target.files?.[0] || null)} />
       </div>
 
+      {/* Start date for all records */}
+      <label style={{ ...LabelStyle(), marginTop: 16 }}>Дата начала для всех записей (необязательно)</label>
+      <input
+        type="date"
+        value={startsAt}
+        onChange={e => setStartsAt(e.target.value)}
+        style={inputSt}
+      />
+
       {file && (
         <button onClick={handleUpload} disabled={uploading} style={{
           width: "100%", padding: 14, borderRadius: 10, border: "none",
@@ -439,10 +596,25 @@ function UploadPage() {
             <span>Ошибка: {result.error}</span>
           ) : (
             <div>
-              <div>✓ {result.filename}</div>
+              <div>✓ Импорт завершён</div>
               <div style={{ marginTop: 6, color: T.text }}>
-                Всего: {result.stats?.total} · Импортировано: {result.stats?.imported} · Пропущено: {result.stats?.skipped} · Ошибки: {result.stats?.errors}
+                Всего: {result.total_rows} · Создано: {result.orders_created} · Пропущено: {result.skipped}
+                {Array.isArray(result.errors) && result.errors.length > 0 && (
+                  <span> · <span
+                    style={{ color: T.red, cursor: "pointer", textDecoration: "underline" }}
+                    onClick={() => setShowErrors(v => !v)}
+                  >
+                    Ошибки: {result.errors.length}
+                  </span></span>
+                )}
               </div>
+              {showErrors && Array.isArray(result.errors) && (
+                <div style={{ marginTop: 8, padding: 8, background: T.red + "11", borderRadius: 6 }}>
+                  {result.errors.map((e, i) => (
+                    <div key={i} style={{ color: T.red, fontSize: 11, marginBottom: 4 }}>• {e}</div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -473,8 +645,8 @@ function StatsPage() {
         {[
           { label: "Имён всего", value: s.total_persons, color: T.purple },
           { label: "Записок всего", value: s.total_orders, color: T.blue },
-          { label: "Активных записок", value: s.active_orders, color: T.gold },
-          { label: "Имён на сегодня", value: s.active_names_today, color: T.green },
+          { label: "Активных записей", value: s.total_commemorations, color: T.gold },
+          { label: "Имён на сегодня", value: s.active_today, color: T.green },
         ].map((item, i) => (
           <div key={i} style={{
             padding: 16, borderRadius: 10, background: T.card,
@@ -513,6 +685,384 @@ function StatsPage() {
   );
 }
 
+// ─── DB Management Page ───────────────────────────────────
+
+function CommemorationManager() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [filterNoStart, setFilterNoStart] = useState(false);
+  const [bulkDate, setBulkDate] = useState("");
+  const [bulkMsg, setBulkMsg] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editValues, setEditValues] = useState({});
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const data = await api(`/commemorations?no_start_date=${filterNoStart}&limit=200`);
+    setItems(data?.items || []);
+    setLoading(false);
+  }, [filterNoStart]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleBulkUpdate = async () => {
+    if (!bulkDate) return;
+    setBulkMsg(null);
+    try {
+      const ids = items.map(i => i.id);
+      const res = await apiOrThrow("/commemorations/bulk-update", {
+        method: "POST",
+        body: JSON.stringify({ ids, starts_at: `${bulkDate}T00:00:00` }),
+      });
+      setBulkMsg(`✓ Обновлено: ${res.updated}`);
+      load();
+    } catch (e) {
+      setBulkMsg(`✗ ${e.message}`);
+    }
+  };
+
+  const startEdit = (item) => {
+    setEditingId(item.id);
+    setEditValues({
+      order_type: item.order_type,
+      period_type: item.period_type,
+      starts_at: item.starts_at ? item.starts_at.slice(0, 10) : "",
+      expires_at: item.expires_at ? item.expires_at.slice(0, 10) : "",
+      prefix: item.prefix || "",
+    });
+  };
+
+  const saveEdit = async (id) => {
+    try {
+      await apiOrThrow(`/commemorations/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          order_type: editValues.order_type || null,
+          period_type: editValues.period_type || null,
+          starts_at: editValues.starts_at ? `${editValues.starts_at}T00:00:00` : null,
+          expires_at: editValues.expires_at ? `${editValues.expires_at}T00:00:00` : null,
+          prefix: editValues.prefix || null,
+        }),
+      });
+      setEditingId(null);
+      load();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const inputSt = { ...InputStyle(), padding: "4px 8px", fontSize: 11 };
+
+  return (
+    <div>
+      {/* Filter */}
+      <label style={{
+        display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+        color: T.dim, fontSize: 12, fontFamily: "'JetBrains Mono', monospace", marginBottom: 12,
+      }}>
+        <input
+          type="checkbox"
+          checked={filterNoStart}
+          onChange={e => setFilterNoStart(e.target.checked)}
+          style={{ width: 15, height: 15 }}
+        />
+        Только без даты начала
+      </label>
+
+      {/* Bulk update bar */}
+      {filterNoStart && (
+        <div style={{
+          display: "flex", gap: 8, alignItems: "center", marginBottom: 12,
+          padding: 10, background: T.card, borderRadius: 8, border: `1px solid ${T.border}`,
+        }}>
+          <input
+            type="date"
+            value={bulkDate}
+            onChange={e => setBulkDate(e.target.value)}
+            style={{ ...inputSt, flex: 1 }}
+          />
+          <button
+            onClick={handleBulkUpdate}
+            disabled={!bulkDate || items.length === 0}
+            style={{
+              padding: "6px 12px", borderRadius: 6, border: "none", cursor: "pointer",
+              background: T.gold, color: T.bg, fontSize: 11, fontWeight: 700,
+              fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap",
+            }}
+          >
+            Установить всем ({items.length})
+          </button>
+        </div>
+      )}
+      {bulkMsg && (
+        <div style={{
+          color: bulkMsg.startsWith("✓") ? T.green : T.red,
+          fontSize: 12, fontFamily: "'JetBrains Mono', monospace", marginBottom: 8,
+        }}>
+          {bulkMsg}
+        </div>
+      )}
+
+      {loading ? <Loading /> : (
+        <div style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>
+          {items.length === 0 && <Empty msg="Нет записей" />}
+          {items.map(item => (
+            <div key={item.id} style={{
+              background: T.card, borderRadius: 8, marginBottom: 6,
+              borderLeft: `3px solid ${item.order_type === "здравие" ? T.green : T.red}`,
+              padding: "8px 12px",
+            }}>
+              {editingId === item.id ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    <span style={{ color: T.dim }}>#{item.id}</span>
+                    <span style={{ color: T.text, fontFamily: "'Cormorant Garamond', serif", fontSize: 14 }}>{item.canonical_name}</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                    <div>
+                      <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>Тип</div>
+                      <select
+                        value={editValues.order_type}
+                        onChange={e => setEditValues(v => ({ ...v, order_type: e.target.value }))}
+                        style={{ ...inputSt, width: "100%" }}
+                      >
+                        <option value="здравие">здравие</option>
+                        <option value="упокоение">упокоение</option>
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>Период</div>
+                      <select
+                        value={editValues.period_type}
+                        onChange={e => setEditValues(v => ({ ...v, period_type: e.target.value }))}
+                        style={{ ...inputSt, width: "100%" }}
+                      >
+                        <option value="разовое">разовое</option>
+                        <option value="сорокоуст">сорокоуст</option>
+                        <option value="полгода">полгода</option>
+                        <option value="год">год</option>
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>Начало</div>
+                      <input type="date" value={editValues.starts_at}
+                        onChange={e => setEditValues(v => ({ ...v, starts_at: e.target.value }))}
+                        style={{ ...inputSt, width: "100%" }} />
+                    </div>
+                    <div>
+                      <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>Конец</div>
+                      <input type="date" value={editValues.expires_at}
+                        onChange={e => setEditValues(v => ({ ...v, expires_at: e.target.value }))}
+                        style={{ ...inputSt, width: "100%" }} />
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                    <button onClick={() => setEditingId(null)} style={{
+                      padding: "4px 10px", borderRadius: 5, border: `1px solid ${T.border}`,
+                      background: "transparent", color: T.dim, cursor: "pointer", fontSize: 11,
+                    }}>Отмена</button>
+                    <button onClick={() => saveEdit(item.id)} style={{
+                      padding: "4px 10px", borderRadius: 5, border: "none",
+                      background: T.gold, color: T.bg, cursor: "pointer", fontSize: 11, fontWeight: 700,
+                    }}>Сохранить</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <span style={{ color: T.dim, marginRight: 6 }}>#{item.id}</span>
+                    <span style={{ color: T.text, fontFamily: "'Cormorant Garamond', serif", fontSize: 14 }}>
+                      {item.prefix ? `${item.prefix} ` : ""}{item.canonical_name}
+                    </span>
+                    <div style={{ color: T.dim, fontSize: 10, marginTop: 2 }}>
+                      {item.order_type} · {item.period_type}
+                      {item.starts_at ? ` · c ${item.starts_at.slice(0, 10)}` : " · без даты начала"}
+                      {item.position != null ? ` · #${item.position}` : ""}
+                    </div>
+                  </div>
+                  <button onClick={() => startEdit(item)} style={{
+                    background: "transparent", border: "none", cursor: "pointer", padding: 4,
+                  }}>
+                    <Icon d={Icons.pencil} size={14} color={T.dim} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OrderManager() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editValues, setEditValues] = useState({});
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const data = await api("/orders?limit=200");
+    setOrders(data || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const startEdit = (order) => {
+    setEditingId(order.id);
+    setEditValues({
+      user_email: order.user_email || "",
+      ordered_at: order.ordered_at ? order.ordered_at.slice(0, 10) : "",
+      need_receipt: order.need_receipt || false,
+    });
+  };
+
+  const saveEdit = async (id) => {
+    try {
+      await apiOrThrow(`/orders/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          user_email: editValues.user_email || null,
+          ordered_at: editValues.ordered_at ? `${editValues.ordered_at}T00:00:00` : null,
+          need_receipt: editValues.need_receipt,
+        }),
+      });
+      setEditingId(null);
+      load();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm(`Удалить записку #${id}? Имена останутся в базе.`)) return;
+    try {
+      await apiOrThrow(`/orders/${id}`, { method: "DELETE" });
+      load();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const inputSt = { ...InputStyle(), padding: "4px 8px", fontSize: 11 };
+
+  return (
+    <div>
+      {loading ? <Loading /> : (
+        <div style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>
+          {orders.length === 0 && <Empty msg="Нет записей" />}
+          {orders.map(order => (
+            <div key={order.id} style={{
+              background: T.card, borderRadius: 8, marginBottom: 6,
+              borderLeft: `3px solid ${T.gold}`, padding: "8px 12px",
+            }}>
+              {editingId === order.id ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ color: T.dim, fontSize: 11 }}>
+                    Записка #{order.id} · {order.source_channel}
+                  </div>
+                  <div>
+                    <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>Email</div>
+                    <input
+                      type="email"
+                      value={editValues.user_email}
+                      onChange={e => setEditValues(v => ({ ...v, user_email: e.target.value }))}
+                      placeholder="не указан"
+                      style={{ ...inputSt, width: "100%" }}
+                    />
+                  </div>
+                  <div>
+                    <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>Дата заказа</div>
+                    <input type="date" value={editValues.ordered_at}
+                      onChange={e => setEditValues(v => ({ ...v, ordered_at: e.target.value }))}
+                      style={{ ...inputSt, width: "100%" }} />
+                  </div>
+                  <label style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    color: T.dim, fontSize: 11, cursor: "pointer",
+                  }}>
+                    <input type="checkbox" checked={editValues.need_receipt}
+                      onChange={e => setEditValues(v => ({ ...v, need_receipt: e.target.checked }))} />
+                    Нужна квитанция
+                  </label>
+                  <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                    <button onClick={() => setEditingId(null)} style={{
+                      padding: "4px 10px", borderRadius: 5, border: `1px solid ${T.border}`,
+                      background: "transparent", color: T.dim, cursor: "pointer", fontSize: 11,
+                    }}>Отмена</button>
+                    <button onClick={() => saveEdit(order.id)} style={{
+                      padding: "4px 10px", borderRadius: 5, border: "none",
+                      background: T.gold, color: T.bg, cursor: "pointer", fontSize: 11, fontWeight: 700,
+                    }}>Сохранить</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <span style={{ color: T.dim, marginRight: 6 }}>#{order.id}</span>
+                    <span style={{ color: T.text }}>{order.user_email || "—"}</span>
+                    {order.need_receipt && <Badge color={T.blue} style={{ marginLeft: 6 }}>квитанция</Badge>}
+                    <div style={{ color: T.dim, fontSize: 10, marginTop: 2 }}>
+                      {order.source_channel}
+                      {order.ordered_at ? ` · ${order.ordered_at.slice(0, 10)}` : ""}
+                      {order.created_at ? ` · создана ${order.created_at.slice(0, 10)}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => startEdit(order)} style={{
+                      background: "transparent", border: "none", cursor: "pointer", padding: 4,
+                    }}>
+                      <Icon d={Icons.pencil} size={14} color={T.dim} />
+                    </button>
+                    <button onClick={() => handleDelete(order.id)} style={{
+                      background: "transparent", border: "none", cursor: "pointer", padding: 4,
+                    }}>
+                      <Icon d={Icons.trash} size={14} color={T.red + "aa"} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DbManagePage() {
+  const [section, setSection] = useState("commemorations");
+
+  return (
+    <div style={{ padding: 16 }}>
+      <h2 style={{ margin: "0 0 12px", color: T.gold, fontSize: 20, fontFamily: "'Cormorant Garamond', serif" }}>
+        База данных
+      </h2>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+        {[
+          { id: "commemorations", label: "Поминовения" },
+          { id: "orders", label: "Записки" },
+        ].map(s => (
+          <button key={s.id} onClick={() => setSection(s.id)} style={{
+            flex: 1, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer",
+            fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
+            background: section === s.id ? T.gold + "33" : T.card,
+            color: section === s.id ? T.gold : T.dim,
+          }}>{s.label}</button>
+        ))}
+      </div>
+
+      {section === "commemorations" && <CommemorationManager />}
+      {section === "orders" && <OrderManager />}
+    </div>
+  );
+}
+
+// ─── Utilities ────────────────────────────────────────────
+
 function Loading() {
   return (
     <div style={{ padding: 40, textAlign: "center" }}>
@@ -542,6 +1092,7 @@ const TABS = [
   { id: "add", label: "Записка", icon: Icons.plus },
   { id: "upload", label: "CSV", icon: Icons.upload },
   { id: "stats", label: "Стат.", icon: Icons.bar },
+  { id: "db", label: "БД", icon: Icons.db },
 ];
 
 export default function SinodikApp() {
@@ -579,6 +1130,7 @@ export default function SinodikApp() {
         {tab === "add" && <AddPage />}
         {tab === "upload" && <UploadPage />}
         {tab === "stats" && <StatsPage />}
+        {tab === "db" && <DbManagePage />}
       </div>
 
       {/* Bottom Tab Bar */}
