@@ -13,7 +13,7 @@ router = APIRouter()
 class OrderCreate(BaseModel):
     order_type: str
     period_type: str
-    names: str
+    names_text: str
     user_email: str | None = None
 
 
@@ -23,7 +23,7 @@ async def create_order(body: OrderCreate, db: AsyncSession = Depends(get_db)):
         db,
         order_type=body.order_type,
         period_type_raw=body.period_type,
-        names_text=body.names,
+        names_text=body.names_text,
         user_email=body.user_email,
     )
     return {

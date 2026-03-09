@@ -30,11 +30,22 @@ async def embed_name_async(name: str) -> list[float] | None:
             resp = await client.post(
                 f"{settings.embedding_url}/embeddings",
                 headers=headers,
-                json={"model": settings.embedding_model, "input": name},
+                json={
+                    "model": settings.embedding_model,
+                    "input": name,
+                    "dimensions": settings.embedding_dim,
+                },
             )
             resp.raise_for_status()
             data = resp.json()
-            return data["data"][0]["embedding"]
+            vec = data["data"][0]["embedding"]
+            # MRL truncation fallback if server ignored dimensions param
+            if len(vec) > settings.embedding_dim:
+                vec = vec[:settings.embedding_dim]
+                norm = sum(x * x for x in vec) ** 0.5
+                if norm > 0:
+                    vec = [x / norm for x in vec]
+            return vec
     except Exception as e:
         logger.warning(f"Embedding failed for '{name}': {e}")
         return None

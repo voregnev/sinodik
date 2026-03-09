@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0c0f1a" />
+<title>Синодик</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0c0f1a; color: #e8dcc8; font-family: system-ui, sans-serif; }
+#root { min-height: 100dvh; }
+#loading { display:flex; align-items:center; justify-content:center; min-height:100dvh; font-size:1.2rem; color:#6b7a99; }
+</style>
+</head>
+<body>
+<div id="root"><div id="loading">Загрузка Синодика...</div></div>
+<script src="/vendor/react.min.js"></script>
+<script src="/vendor/react-dom.min.js"></script>
+<script src="/vendor/babel.min.js"></script>
+<script>
+(async function() {
+  var r = await fetch("SinodikApp.jsx");
+  var src = await r.text();
+  src = src.replace(/^import\s*\{([^}]+)\}\s*from\s*["']react["'];?\s*$/m, "const {$1} = React;");
+  src = src.replace(/^export\s+default\s+/m, "");
+  var out = Babel.transform(src, { presets: ["react"], filename: "app.jsx" });
+  var el = document.createElement("script");
+  el.textContent = out.code;
+  document.body.appendChild(el);
+  ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(SinodikApp));
+})();
+</script>
+</body>
+</html>

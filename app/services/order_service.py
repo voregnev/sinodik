@@ -15,6 +15,7 @@ import logging
 from datetime import datetime
 
 from sqlalchemy import select, text
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Person, Order, Commemoration
@@ -95,16 +96,34 @@ async def find_or_create_person(
         except Exception as e:
             logger.debug(f"Vector search failed: {e}")
 
-    # 4. Create new
-    person = Person(
-        canonical_name=canonical,
-        genitive_name=parsed.genitive if hasattr(parsed, 'genitive') else None,
-        gender=parsed.gender if hasattr(parsed, 'gender') else None,
-        name_variants=[parsed.raw] if parsed.raw != canonical else [],
-        embedding=embedding,
+    # 4. Create new (safe against concurrent inserts)
+    genitive = parsed.genitive if hasattr(parsed, "genitive") else None
+    gender = parsed.gender if hasattr(parsed, "gender") else None
+    variants = [parsed.raw] if parsed.raw != canonical else []
+
+    stmt = (
+        insert(Person)
+        .values(
+            canonical_name=canonical,
+            genitive_name=genitive,
+            gender=gender,
+            name_variants=variants,
+            embedding=embedding,
+        )
+        .on_conflict_do_nothing(index_elements=[Person.canonical_name])
+        .returning(Person)
     )
-    db.add(person)
-    await db.flush()
+
+    result = await db.execute(stmt)
+    person = result.scalar_one_or_none()
+
+    if not person:
+        # Another transaction inserted this person concurrently — fetch it.
+        result = await db.execute(
+            select(Person).where(Person.canonical_name == canonical)
+        )
+        person = result.scalar_one()
+
     return person
 
 
@@ -213,8 +232,12 @@ async def process_csv_upload(
         except Exception as e:
             logger.error(f"Error processing row: {e}")
             stats["errors"] += 1
+            await db.rollback()
+            continue
 
-    await db.commit()
+        # Фиксируем успешную строку отдельно, чтобы ошибки
+        # в последующих строках не откатывали уже созданные записи.
+        await db.commit()
     logger.info(f"CSV import: {stats}")
     return stats
 

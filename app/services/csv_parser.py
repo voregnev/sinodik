@@ -23,38 +23,56 @@ class CsvRow:
 
 _COL_ALIASES: dict[str, list[str]] = {
     "external_id": ["tranid", "id", "номер", "transaction_id"],
-    "date":        ["date", "дата", "дата заказа", "ordered_at"],
+    "date":        ["date", "дата", "дата заказа", "ordered_at", "created"],
     "email":       ["email", "e-mail", "почта", "заказчик"],
-    "order_type":  ["тип", "type", "тип записки", "order_type"],
+    "order_type":  ["тип", "type", "тип записки", "тип_записок", "order_type"],
     "period_raw":  ["период", "period", "radio", "срок"],
     "names_raw":   ["комментарий", "comment", "names", "имена", "текст"],
 }
 
 
 def _find_col(headers: dict[str, str], field: str) -> str:
-    """Find column value by checking known aliases."""
-    for alias in _COL_ALIASES.get(field, []):
+    """Find column value by checking known aliases (exact, then prefix match)."""
+    aliases = _COL_ALIASES.get(field, [])
+    # Exact match first
+    for alias in aliases:
         if alias in headers:
             return headers[alias]
+    # Prefix match (e.g. "имена" matches "имена_для_поминовения_о_здравии_0")
+    for alias in aliases:
+        for col in headers:
+            if col.startswith(alias):
+                return headers[col]
     return ""
 
 
 def parse_csv(content: bytes, delimiter: str = ";") -> list[CsvRow]:
     text = content.decode("utf-8-sig")
-    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+
+    # Простая авто-детекция разделителя:
+    # если по умолчанию ожидаем `;`, но в первой строке только запятые —
+    # считаем, что это CSV с запятой.
+    effective_delimiter = delimiter
+    if delimiter == ";":
+        first_line = text.splitlines()[0] if text else ""
+        if ";" not in first_line and "," in first_line:
+            effective_delimiter = ","
+
+    reader = csv.DictReader(io.StringIO(text), delimiter=effective_delimiter)
 
     rows: list[CsvRow] = []
     for raw in reader:
         r = {k.strip().lower(): (v.strip() if v else "") for k, v in raw.items()}
 
         date_str = _find_col(r, "date")
-        try:
-            date = datetime.strptime(date_str, "%d.%m.%Y")
-        except ValueError:
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%d.%m.%Y %H:%M:%S", "%Y-%m-%d", "%d.%m.%Y"):
             try:
-                date = datetime.strptime(date_str, "%Y-%m-%d")
+                date = datetime.strptime(date_str, fmt)
+                break
             except ValueError:
-                date = datetime.utcnow()
+                continue
+        else:
+            date = datetime.utcnow()
 
         names_raw = _find_col(r, "names_raw")
         if not names_raw:
