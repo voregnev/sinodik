@@ -70,6 +70,7 @@ async def get_active_today(
             Person.id.label("person_id"),
             Person.canonical_name,
             Person.genitive_name,
+            Order.id.label("order_id"),
             Order.user_email,
         )
         .join(Person, Person.id == Commemoration.person_id)
@@ -109,6 +110,7 @@ async def get_active_today(
             "ordered_at": r.ordered_at.isoformat() if r.ordered_at else None,
             "starts_at": r.starts_at.isoformat() if r.starts_at else None,
             "expires_at": r.expires_at.isoformat() if r.expires_at else None,
+            "order_id": r.order_id,
             "user_email": r.user_email,
             "position": r.position,
         }

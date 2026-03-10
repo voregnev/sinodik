@@ -40,6 +40,7 @@ const Icons = {
   pencil: "M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z",
   trash: "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6",
   save: "M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8",
+  fileText: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8",
 };
 
 // ─── Fetch helper (returns null on error) ─────────────────
@@ -197,7 +198,7 @@ function TodayPage() {
 
   return (
     <div>
-      <div style={{ padding: "16px 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ padding: "16px 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div>
           <h2 style={{ margin: 0, color: T.gold, fontSize: 20, fontFamily: "'Cormorant Garamond', serif" }}>
             Имена на сегодня
@@ -206,6 +207,21 @@ function TodayPage() {
             {data.date} · {data.total} имён
           </div>
         </div>
+        <a
+          href={`${API}/names/today.pdf`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "8px 14px", borderRadius: 8, border: `1px solid ${T.gold}44`,
+            background: T.gold + "22", color: T.gold, textDecoration: "none",
+            fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
+            cursor: "pointer",
+          }}
+        >
+          <Icon d={Icons.fileText} size={18} color={T.gold} />
+          Скачать PDF
+        </a>
       </div>
 
       {/* Filter tabs */}
