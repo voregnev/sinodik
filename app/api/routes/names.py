@@ -116,11 +116,37 @@ async def names_today_pdf(
 
     margin_left = 20 * mm
     margin_right = 20 * mm
-    margin_top = 25 * mm
+    margin_top = 32 * mm  # место под крест + заголовок 24
     margin_bottom = 15 * mm
 
-    line_height = 10  # pt
+    line_height = 24  # полтора интервала (1.5 × 16)
+    name_font_size = 20
+    prefix_suffix_font_size = 14
+    prefix_suffix_gray = 0.45  # бледнее
     small_line_height = 9
+
+    # Колонтитул: православный крест ☦ (ч/б) + заголовок 24 по центру
+    HEADER_TITLE_SIZE = 24
+    HEADER_CROSS_SIZE = 22
+
+    def draw_header(page_title: str):
+        y_top = height - 12 * mm
+        # Православный крест сверху, по центру, ч/б
+        c.setFont(FONT_MAIN, HEADER_CROSS_SIZE)
+        c.setFillColor(colors.black)
+        c.drawCentredString(width / 2, y_top, "☦")
+        # Заголовок крупно 24 по центру
+        c.setFont(FONT_BOLD, HEADER_TITLE_SIZE)
+        c.drawCentredString(width / 2, y_top - HEADER_TITLE_SIZE - 4, page_title)
+
+    def draw_footer(page_num: int):
+        """Подвал: дата и номер страницы мелко."""
+        c.setFont(FONT_MAIN, 8)
+        c.setFillColor(colors.grey)
+        date_str = current_date.strftime("%d.%m.%Y")
+        c.drawCentredString(width / 2, margin_bottom / 2 + 6, date_str)
+        c.drawCentredString(width / 2, margin_bottom / 2 - 4, str(page_num))
+        c.setFillColor(colors.black)
 
     page_number = 1
 
@@ -140,22 +166,6 @@ async def names_today_pdf(
             by_type[t] = []
         by_type[t].append(n)
 
-    def draw_header(page_title: str):
-        c.setFont(FONT_BOLD, 16)
-        c.drawCentredString(width / 2, height - margin_top, page_title)
-        c.setFont(FONT_MAIN, 9)
-        c.drawCentredString(
-            width / 2,
-            height - margin_top - 14,
-            current_date.strftime("%d.%m.%Y"),
-        )
-
-    def draw_page_number(num: int):
-        c.setFont(FONT_MAIN, 8)
-        c.setFillColor(colors.grey)
-        c.drawCentredString(width / 2, margin_bottom / 2, str(num))
-        c.setFillColor(colors.black)
-
     for t in type_order:
         records = by_type.get(t) or []
         if not records:
@@ -164,15 +174,18 @@ async def names_today_pdf(
         # Новая страница для каждого типа
         draw_header(type_titles.get(t, t))
 
-        y = height - margin_top - 30
+        y = height - margin_top - 50  # под крест и заголовок 24
 
         # Группировка: период → order_id → список имён
         periods_order = ["сорокоуст", "год", "полгода", "разовое"]
+        # Подзаголовки периода — светло-серые тонкие линии (--, ----, -----, ------)
         period_labels = {
-            "сорокоуст": "сорокоуст",
-            "год": "годовое",
-            "полгода": "полугодовое",
+            "разовое": "--",
+            "сорокоуст": "----",
+            "полгода": "------",
+            "год": "-----",
         }
+        period_label_gray = 0.7  # светло-серый
 
         period_groups: dict[str, dict] = {}
         for r in records:
@@ -187,67 +200,81 @@ async def names_today_pdf(
             if not orders_for_period:
                 continue
 
-            # Подзаголовок периода (кроме разового)
-            label = period_labels.get(p)
+            # Подзаголовок периода (светло-серый, тонко)
+            label = period_labels.get(p, "")
             if label:
                 if y < margin_bottom + 3 * line_height:
-                    draw_page_number(page_number)
+                    draw_footer(page_number)
                     c.showPage()
                     page_number += 1
                     draw_header(type_titles.get(t, t))
-                    y = height - margin_top - 30
-                c.setFont(FONT_BOLD, 11)
-                c.drawString(margin_left, y, label)
+                    y = height - margin_top - 50
+                c.setFont(FONT_MAIN, 10)
+                c.setFillColor(colors.Color(period_label_gray, period_label_gray, period_label_gray))
+                c.drawCentredString(width / 2, y, label)
+                c.setFillColor(colors.black)
                 y -= line_height
 
-            # Заказы внутри периода
+            # Заказы внутри периода (без email)
             for order_id, data in orders_for_period.items():
                 if y < margin_bottom + 4 * line_height:
-                    draw_page_number(page_number)
+                    draw_footer(page_number)
                     c.showPage()
                     page_number += 1
                     draw_header(type_titles.get(t, t))
-                    y = height - margin_top - 30
+                    y = height - margin_top - 50
 
-                # Имя/почта заказчика мелким шрифтом
-                user_label = data["user_email"] or ""
-                if user_label:
-                    c.setFont(FONT_ITALIC, 8)
-                    c.setFillColor(colors.grey)
-                    c.drawString(margin_left, y, user_label)
-                    c.setFillColor(colors.black)
-                    y -= small_line_height
-
-                # Сами имена
-                c.setFont(FONT_MAIN, 10)
+                # Имена: центр, имя 20, префикс/суффикс 14 бледнее
+                c.setFont(FONT_MAIN, name_font_size)
                 for item in data["items"]:
                     if y < margin_bottom + 2 * line_height:
-                        draw_page_number(page_number)
+                        draw_footer(page_number)
                         c.showPage()
                         page_number += 1
                         draw_header(type_titles.get(t, t))
-                        y = height - margin_top - 30
-                        c.setFont(FONT_MAIN, 10)
+                        y = height - margin_top - 50
+                        c.setFont(FONT_MAIN, name_font_size)
 
-                    parts = []
-                    if item.get("prefix"):
-                        parts.append(item["prefix"])
-                    name = item.get("genitive_name") or item.get("canonical_name") or ""
+                    prefix = (item.get("prefix") or "").strip()
+                    name = (item.get("genitive_name") or item.get("canonical_name") or "").strip()
+                    suffix = (item.get("suffix") or "").strip()
+
+                    # Ширины для центрирования
+                    c.setFont(FONT_MAIN, prefix_suffix_font_size)
+                    w_prefix = c.stringWidth(prefix, FONT_MAIN, prefix_suffix_font_size) if prefix else 0
+                    c.setFont(FONT_MAIN, name_font_size)
+                    w_name = c.stringWidth(name, FONT_MAIN, name_font_size) if name else 0
+                    c.setFont(FONT_MAIN, prefix_suffix_font_size)
+                    w_suffix = c.stringWidth(suffix, FONT_MAIN, prefix_suffix_font_size) if suffix else 0
+                    gap = 4
+                    total_w = w_prefix + (gap if prefix and name else 0) + w_name + (gap if name and suffix else 0) + w_suffix
+                    x_start = (width - total_w) / 2
+
+                    c.setFillColor(colors.Color(prefix_suffix_gray, prefix_suffix_gray, prefix_suffix_gray))
+                    c.setFont(FONT_MAIN, prefix_suffix_font_size)
+                    if prefix:
+                        c.drawString(x_start, y, prefix)
+                        x_start += w_prefix + gap
+                    c.setFillColor(colors.black)
+                    c.setFont(FONT_MAIN, name_font_size)
                     if name:
-                        parts.append(name)
-                    if item.get("suffix"):
-                        parts.append(item["suffix"])
-                    line = " ".join(parts)
-                    c.drawString(margin_left, y, line)
+                        c.drawString(x_start, y, name)
+                        x_start += w_name + gap
+                    c.setFillColor(colors.Color(prefix_suffix_gray, prefix_suffix_gray, prefix_suffix_gray))
+                    c.setFont(FONT_MAIN, prefix_suffix_font_size)
+                    if suffix:
+                        c.drawString(x_start, y, suffix)
+                    c.setFillColor(colors.black)
+
                     y -= line_height
 
                 # Пунктирная линия между заказами
                 if y < margin_bottom + 2 * line_height:
-                    draw_page_number(page_number)
+                    draw_footer(page_number)
                     c.showPage()
                     page_number += 1
                     draw_header(type_titles.get(t, t))
-                    y = height - margin_top - 30
+                    y = height - margin_top - 50
 
                 c.setStrokeColor(colors.lightgrey)
                 c.setLineWidth(0.3)
@@ -258,7 +285,7 @@ async def names_today_pdf(
                 y -= small_line_height
 
         # Номер страницы и переход к следующей (если ещё будут типы)
-        draw_page_number(page_number)
+        draw_footer(page_number)
         if t != type_order[-1]:
             c.showPage()
             page_number += 1
