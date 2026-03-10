@@ -103,6 +103,15 @@ class TestFullExtraction:
         assert result[0].canonical == "Евгения"
         assert result[0].gender == "ж"
 
+    def test_prefix_n_proc_zoya(self):
+        """Н. пр. Зои (07.03) — вариант «Н. пр.» распознаётся как нпр., одна запись Зоя."""
+        result = extract_names("Н. пр. Зои (07.03)")
+        assert len(result) == 1
+        assert result[0].canonical == "Зоя"
+        assert result[0].genitive == "Зои"
+        assert result[0].gender == "ж"
+        assert result[0].prefix == "нпр."
+
     # ── Explicit gender marker ────────────────────────────
 
     def test_explicit_gender_marker(self):

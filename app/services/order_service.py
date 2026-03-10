@@ -15,12 +15,13 @@ import hashlib
 import logging
 from datetime import datetime
 
-from sqlalchemy import select, text
+from sqlalchemy import select, text, func
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Person, Order, Commemoration
 from app.nlp import extract_names, ParsedName, llm_parse_names
+from app.nlp.names_dict import is_ambiguous
 from app.services.csv_parser import CsvRow, parse_csv
 from app.services.period_calculator import (
     calculate_expires_at,
@@ -72,6 +73,49 @@ async def find_or_create_person(
     )
     person = result.scalar_one_or_none()
     if person:
+        return person
+
+    # 1b. Match by known variants in name_variants (синонимы имён в словаре Person)
+    result = await db.execute(
+        select(Person).where(Person.name_variants.contains([canonical]))
+    )
+    person = result.scalar_one_or_none()
+    if person:
+        # При необходимости добавляем canonical как ещё один вариант
+        if canonical not in (person.name_variants or []):
+            person.name_variants = list(person.name_variants or []) + [canonical]
+        return person
+
+    # Ambiguous names (Александра/Александр, Евгения/Евгений и т.п.):
+    # не сливаем их через fuzzy-дедупликацию с уже существующей записью другого пола.
+    # Если точного совпадения по canonical_name нет — создаём отдельный Person.
+    if is_ambiguous(canonical):
+        genitive = parsed.genitive if hasattr(parsed, "genitive") else None
+        gender = parsed.gender if hasattr(parsed, "gender") else None
+        variants = [parsed.raw] if parsed.raw != canonical else []
+
+        stmt = (
+            insert(Person)
+            .values(
+                canonical_name=canonical,
+                genitive_name=genitive,
+                gender=gender,
+                name_variants=variants,
+                embedding=None,
+            )
+            .on_conflict_do_nothing(index_elements=[Person.canonical_name])
+            .returning(Person)
+        )
+
+        result = await db.execute(stmt)
+        person = result.scalar_one_or_none()
+
+        if not person:
+            result = await db.execute(
+                select(Person).where(Person.canonical_name == canonical)
+            )
+            person = result.scalar_one()
+
         return person
 
     # 2. Trigram similarity (в savepoint — при ошибке не ломаем основную транзакцию)
@@ -206,6 +250,8 @@ async def process_row(
         source_channel="csv",
         source_raw=row.names_raw,
         external_id=ext_id,
+        order_type=order_type,
+        period_type=period_type,
     )
     db.add(order)
     await db.flush()
@@ -331,6 +377,8 @@ async def create_manual_order(
         source_raw=names_text,
         external_id=ext_id,
         need_receipt=need_receipt,
+        order_type=otype,
+        period_type=ptype,
     )
     db.add(order)
     await db.flush()
@@ -357,4 +405,60 @@ async def create_manual_order(
         commemorations.append(comm)
 
     await db.commit()
+    return commemorations
+
+
+# ─── Refill order from source_raw when commemorations were all deleted ──
+
+async def refill_order_commemorations(
+    db: AsyncSession,
+    order: Order,
+) -> list[Commemoration]:
+    """
+    Если у записки нет поминовений, но есть source_raw — парсим заново и создаём поминовения.
+    Вызывается при PATCH записки.
+    """
+    count_result = await db.execute(
+        select(func.count(Commemoration.id)).where(Commemoration.order_id == order.id)
+    )
+    if count_result.scalar() != 0:
+        return []
+
+    if not order.source_raw or not order.source_raw.strip():
+        return []
+
+    order_type = normalize_order_type(order.order_type) if order.order_type else "здравие"
+    period_type = normalize_period_type(order.period_type) if order.period_type else "разовое"
+    ordered_at = order.ordered_at or datetime.utcnow()
+    starts_at = None
+    expires_at = calculate_expires_at(starts_at, period_type) if starts_at else None
+
+    names = extract_names(order.source_raw)
+    if order.source_raw and (not names or any(n.confidence < 0.5 for n in names)):
+        llm_names = await llm_parse_names(order.source_raw)
+        if llm_names:
+            names = llm_names
+
+    if not names:
+        return []
+
+    commemorations: list[Commemoration] = []
+    for idx, parsed_name in enumerate(names, start=1):
+        person = await find_or_create_person(db, parsed_name)
+        comm = Commemoration(
+            person_id=person.id,
+            order_id=order.id,
+            order_type=order_type,
+            period_type=period_type,
+            prefix=_norm_opt_str(parsed_name.prefix),
+            suffix=_norm_opt_str(parsed_name.suffix),
+            ordered_at=ordered_at,
+            starts_at=starts_at,
+            expires_at=expires_at,
+            is_active=True,
+            position=idx,
+        )
+        db.add(comm)
+        commemorations.append(comm)
+
     return commemorations

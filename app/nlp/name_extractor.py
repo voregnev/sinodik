@@ -45,6 +45,7 @@ from app.nlp.patterns import (
     NAME_DELIMITERS,
     NOISE_PATTERNS,
     VALID_NAME_RE,
+    name_has_vowel,
 )
 from app.nlp.names_dict import (
     NameEntry,
@@ -306,7 +307,7 @@ def extract_names(text: str | None) -> list[ParsedName]:
                 i += 1
                 continue
 
-            # Lookup key: try lowercase with trailing dot stripped, then with dot
+            # Поиск префикса: нормализуем регистр (автозамена в редакторах даёт Н., Пр. и т.д.)
             key_no_dot = token.lower().rstrip(".")
             key_with_dot = token.lower()
 
@@ -331,7 +332,8 @@ def extract_names(text: str | None) -> list[ParsedName]:
                         continue
 
             clean_token = token.strip().rstrip(".")
-            if not clean_token:
+            # Имя в записке никогда не заменяется на точку — пропускаем пустое/одни точки
+            if not clean_token or clean_token == ".":
                 i += 1
                 continue
 
@@ -339,7 +341,8 @@ def extract_names(text: str | None) -> list[ParsedName]:
                    if len(clean_token) > 1 else clean_token.upper())
             entries = lookup_any(cap)
 
-            if entries or VALID_NAME_RE.match(cap):
+            # В имени всегда есть гласная (отсекает "Пр", "Н" из сокращений с автозаменой)
+            if (entries or VALID_NAME_RE.match(cap)) and name_has_vowel(cap):
                 # Gender hint: from prefix (first one that provides a hint), or chunk marker
                 pfx_gender: str | None = None
                 for pfx in current_prefixes:
@@ -349,7 +352,12 @@ def extract_names(text: str | None) -> list[ParsedName]:
                         break
                 gender_hint = chunk_gender_hint or pfx_gender
 
-                combined_prefix = " ".join(current_prefixes) if current_prefixes else None
+                # Collapse consecutive duplicate prefixes: "нпр." + "нпр." → "нпр."
+                seen: list[str] = []
+                for p in current_prefixes:
+                    if not seen or seen[-1] != p:
+                        seen.append(p)
+                combined_prefix = " ".join(seen) if seen else None
 
                 raw_tokens.append(RawToken(
                     text=clean_token,
@@ -380,7 +388,7 @@ def extract_names(text: str | None) -> list[ParsedName]:
 
     for rt in raw_tokens:
         parsed = _resolve_token(rt.text, case_context, rt.gender_hint)
-        if parsed:
+        if parsed and name_has_vowel(parsed.canonical):
             parsed.prefix = rt.prefix
             parsed.suffix = rt.suffix
             results.append(parsed)

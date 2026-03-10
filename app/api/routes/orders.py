@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Order
-from app.services.order_service import create_manual_order
+from app.models import Order, Commemoration, Person
+from app.services.order_service import create_manual_order, refill_order_commemorations
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -77,6 +77,52 @@ async def list_orders(
     ]
 
 
+@router.get("/orders/{order_id}")
+async def get_order(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get one order with source_raw and list of extracted commemorations (names with prefix/suffix)."""
+    order_result = await db.execute(select(Order).where(Order.id == order_id))
+    order = order_result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    comm_result = await db.execute(
+        select(Commemoration, Person.canonical_name, Person.genitive_name)
+        .join(Person, Person.id == Commemoration.person_id)
+        .where(Commemoration.order_id == order_id)
+        .order_by(Commemoration.position.asc().nullslast(), Commemoration.id.asc())
+    )
+    comm_list = [
+        {
+            "id": c.id,
+            "canonical_name": name or "",
+            "genitive_name": genitive,
+            "prefix": c.prefix,
+            "suffix": c.suffix,
+            "order_type": c.order_type,
+            "period_type": c.period_type,
+            "position": c.position,
+            "starts_at": c.starts_at.isoformat() if c.starts_at else None,
+            "expires_at": c.expires_at.isoformat() if c.expires_at else None,
+        }
+        for c, name, genitive in comm_result.all()
+    ]
+
+    return {
+        "id": order.id,
+        "user_email": order.user_email,
+        "source_channel": order.source_channel,
+        "source_raw": order.source_raw,
+        "external_id": order.external_id,
+        "need_receipt": order.need_receipt,
+        "ordered_at": order.ordered_at.isoformat() if order.ordered_at else None,
+        "created_at": order.created_at.isoformat() if order.created_at else None,
+        "commemorations": comm_list,
+    }
+
+
 @router.patch("/orders/{order_id}")
 async def update_order(
     order_id: int,
@@ -98,11 +144,17 @@ async def update_order(
     await db.commit()
     await db.refresh(order)
 
+    # Если у записки нет поминовений, но есть source_raw — парсим заново и добавляем имена
+    refilled = await refill_order_commemorations(db, order)
+    if refilled:
+        await db.commit()
+
     return {
         "id": order.id,
         "user_email": order.user_email,
         "ordered_at": order.ordered_at.isoformat() if order.ordered_at else None,
         "need_receipt": order.need_receipt,
+        "commemorations_refilled": len(refilled),
     }
 
 
@@ -112,6 +164,8 @@ async def delete_order(order_id: int, db: AsyncSession = Depends(get_db)):
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+    # Каскадно удаляем все поминовения этой записки (работает и до применения миграции CASCADE)
+    await db.execute(Commemoration.__table__.delete().where(Commemoration.order_id == order_id))
     await db.delete(order)
     await db.commit()
     return {"deleted": order_id}

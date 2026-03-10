@@ -99,12 +99,11 @@ function Tab({ active, label, icon, onClick }) {
   );
 }
 
-function NameCard({ name, genitiveName, prefix, suffix, orderType, periodType, expiresAt, position }) {
+function NameCard({ name, genitiveName, prefix, suffix, orderType, periodType, expiresAt, position, showPosition = true, showTypeBadge = true }) {
   const isHealth = orderType === "здравие";
   const color = isHealth ? T.green : T.red;
   const exp = expiresAt ? new Date(expiresAt) : null;
   const daysLeft = exp ? Math.max(0, Math.ceil((exp - new Date()) / 86400000)) : 0;
-  // Show genitive if available, otherwise fall back to nominative
   const displayName = genitiveName || name;
 
   return (
@@ -118,7 +117,7 @@ function NameCard({ name, genitiveName, prefix, suffix, orderType, periodType, e
           {prefix && <span style={{ color: T.dim, fontSize: 12, fontStyle: "italic", marginRight: 5 }}>{prefix}</span>}
           {displayName}
           {suffix && <span style={{ color: T.dim, fontSize: 12, fontStyle: "italic", marginLeft: 5 }}>{suffix}</span>}
-          {position != null && (
+          {showPosition && position != null && (
             <span style={{ color: T.dim, fontSize: 10, marginLeft: 6, fontFamily: "'JetBrains Mono', monospace" }}>
               #{position}
             </span>
@@ -130,7 +129,7 @@ function NameCard({ name, genitiveName, prefix, suffix, orderType, periodType, e
           </div>
         )}
       </div>
-      <Badge color={color}>{isHealth ? "здр." : "уп."}</Badge>
+      {showTypeBadge && <Badge color={color}>{isHealth ? "здр." : "уп."}</Badge>}
     </div>
   );
 }
@@ -273,6 +272,8 @@ function TodayPage() {
                           periodType={null}
                           expiresAt={n.expires_at}
                           position={n.position}
+                          showPosition={false}
+                          showTypeBadge={false}
                         />
                       ))}
                     </div>
@@ -363,10 +364,11 @@ function SearchPage() {
 }
 
 function AddPage() {
+  const INITIAL_NAME_FIELDS = 5;
   const [form, setForm] = useState({
     orderType: "О здравии",
     periodType: "Сорокоуст (40 дней)",
-    names: "",
+    nameFields: Array(INITIAL_NAME_FIELDS).fill(""),
     startsAt: "",
     notifyAccept: false,
     userEmail: "",
@@ -374,9 +376,64 @@ function AddPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionsForIndex, setSuggestionsForIndex] = useState(null);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const suggestTimerRef = useRef(null);
+  const lastFieldRef = useRef(null);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+
+  const fetchSuggestions = useCallback(async (q) => {
+    if (!q || q.trim().length < 2) {
+      setSuggestions([]);
+      setActiveSuggestion(-1);
+      return;
+    }
+    setSuggestionsLoading(true);
+    const data = await api(`/persons?limit=20&q=${encodeURIComponent(q.trim())}`);
+    setSuggestions(data?.items || []);
+    setActiveSuggestion(data?.items?.length ? 0 : -1);
+    setSuggestionsLoading(false);
+  }, []);
+
+  const updateNameField = (index, value) => {
+    setForm(f => {
+      const next = [...f.nameFields];
+      next[index] = value;
+      return { ...f, nameFields: next };
+    });
+    setSuggestionsForIndex(index);
+    if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
+    if (value.trim().length >= 2) {
+      suggestTimerRef.current = setTimeout(() => fetchSuggestions(value), 250);
+    } else {
+      setSuggestions([]);
+      setActiveSuggestion(-1);
+    }
+  };
+
+  const selectSuggestion = (index, person) => {
+    const displayName = person.genitive_name || person.canonical_name;
+    setForm(f => {
+      const next = [...f.nameFields];
+      next[index] = displayName;
+      return { ...f, nameFields: next };
+    });
+    setSuggestions([]);
+    setSuggestionsForIndex(null);
+    setActiveSuggestion(-1);
+  };
+
+  const addNameField = () => {
+    setForm(f => ({ ...f, nameFields: [...f.nameFields, ""] }));
+    setTimeout(() => {
+      lastFieldRef.current?.focus();
+    }, 80);
+  };
 
   const handleSubmit = async () => {
-    if (!form.names.trim()) return;
+    const namesText = form.nameFields.map(s => s.trim()).filter(Boolean).join(", ");
+    if (!namesText) return;
     if (form.notifyAccept && !form.userEmail.trim()) {
       setError("Укажите email для уведомления о принятии");
       return;
@@ -390,7 +447,7 @@ function AddPage() {
         body: JSON.stringify({
           order_type: form.orderType,
           period_type: form.periodType,
-          names_text: form.names,
+          names_text: namesText,
           starts_at: form.startsAt ? `${form.startsAt}T00:00:00` : null,
           need_receipt: form.notifyAccept,
           user_email: form.notifyAccept ? form.userEmail.trim() || null : null,
@@ -398,7 +455,13 @@ function AddPage() {
       });
       setResult(data);
       if (data?.order_id) {
-        setForm(f => ({ ...f, names: "", startsAt: "", notifyAccept: false, userEmail: "" }));
+        setForm(f => ({
+          ...f,
+          nameFields: Array(INITIAL_NAME_FIELDS).fill(""),
+          startsAt: "",
+          notifyAccept: false,
+          userEmail: "",
+        }));
       }
     } catch (e) {
       setError(e.message);
@@ -406,7 +469,8 @@ function AddPage() {
     setSubmitting(false);
   };
 
-  const canSubmit = form.names.trim() && (!form.notifyAccept || form.userEmail.trim());
+  const hasNames = form.nameFields.some(s => s.trim().length > 0);
+  const canSubmit = hasNames && (!form.notifyAccept || form.userEmail.trim());
 
   const inputSt = InputStyle();
   const labelSt = LabelStyle();
@@ -447,18 +511,120 @@ function AddPage() {
         ))}
       </div>
 
-      {/* Names textarea */}
-      <label style={labelSt}>Имена (через запятую, пробел или перенос строки)</label>
-      <textarea
-        value={form.names}
-        onChange={e => setForm(f => ({ ...f, names: e.target.value }))}
-        placeholder="Николая, Тамары, Ксении..."
-        rows={4}
-        style={{
-          ...inputSt, resize: "vertical",
-          fontFamily: "'Cormorant Garamond', serif", fontSize: 15,
-        }}
-      />
+      {/* Имена: отдельные поля с автодополнением из словаря */}
+      <label style={labelSt}>Имена (из словаря или своё)</label>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {form.nameFields.map((value, index) => {
+          const isLast = index === form.nameFields.length - 1;
+          const showSuggestions = suggestionsForIndex === index && suggestions.length > 0;
+          return (
+            <div key={index} style={{ position: "relative" }}>
+              <input
+                ref={isLast ? lastFieldRef : undefined}
+                type="text"
+                value={value}
+                onChange={e => updateNameField(index, e.target.value)}
+                onFocus={() => {
+                  setSuggestionsForIndex(index);
+                }}
+                onKeyDown={e => {
+                  if (suggestionsForIndex === index && suggestions.length) {
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      setActiveSuggestion(prev => {
+                        const next = prev + 1;
+                        return next >= suggestions.length ? 0 : next;
+                      });
+                    } else if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setActiveSuggestion(prev => {
+                        const next = prev - 1;
+                        return next < 0 ? suggestions.length - 1 : next;
+                      });
+                    } else if (e.key === "Enter") {
+                      if (suggestions.length) {
+                        e.preventDefault();
+                        const idx = activeSuggestion >= 0 ? activeSuggestion : 0;
+                        selectSuggestion(index, suggestions[idx]);
+                      }
+                    } else if (e.key === "Escape") {
+                      setSuggestions([]);
+                      setSuggestionsForIndex(null);
+                      setActiveSuggestion(-1);
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  setTimeout(() => setSuggestions([]), 150);
+                }}
+                placeholder={`Имя ${index + 1}`}
+                style={{
+                  ...inputSt,
+                  fontFamily: "'Cormorant Garamond', serif",
+                  fontSize: 15,
+                  paddingRight: suggestionsLoading ? 32 : 10,
+                }}
+              />
+              {suggestionsForIndex === index && suggestionsLoading && (
+                <span style={{
+                  position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                  color: T.dim, fontSize: 10,
+                }}>…</span>
+              )}
+              {showSuggestions && (
+                <div style={{
+                  position: "absolute", left: 0, right: 0, top: "100%", zIndex: 10,
+                  marginTop: 2, maxHeight: 160, overflow: "auto",
+                  background: T.card, border: `1px solid ${T.border}`, borderRadius: 8,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                }}>
+                  {suggestions.map((p, sIdx) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onMouseDown={e => { e.preventDefault(); selectSuggestion(index, p); }}
+                      style={{
+                        width: "100%", textAlign: "left", padding: "8px 12px",
+                        background: activeSuggestion === sIdx ? T.gold + "33" : "transparent",
+                        border: "none", cursor: "pointer",
+                        color: T.text, fontSize: 14, fontFamily: "'Cormorant Garamond', serif",
+                        borderBottom: `1px solid ${T.border}`,
+                      }}
+                    >
+                      {p.genitive_name || p.canonical_name}
+                      {p.canonical_name !== (p.genitive_name || p.canonical_name) && (
+                        <span style={{ color: T.dim, fontSize: 12, marginLeft: 6 }}>
+                          ({p.canonical_name})
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {form.nameFields.length >= INITIAL_NAME_FIELDS && (
+          <button
+            type="button"
+            onClick={addNameField}
+            style={{
+              marginTop: 4,
+              alignSelf: "flex-start",
+              padding: "4px 10px",
+              borderRadius: 6,
+              border: `1px dashed ${T.border}`,
+              background: "transparent",
+              color: T.dim,
+              cursor: "pointer",
+              fontSize: 11,
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            + Добавить имя
+          </button>
+        )}
+      </div>
 
       {/* Start date */}
       <label style={{ ...labelSt, marginTop: 12 }}>Дата начала (необязательно)</label>
@@ -480,7 +646,7 @@ function AddPage() {
           onChange={e => setForm(f => ({ ...f, notifyAccept: e.target.checked }))}
           style={{ width: 16, height: 16, cursor: "pointer" }}
         />
-        Известить о принятии
+        Уведомить
       </label>
 
       {form.notifyAccept && (
@@ -777,7 +943,6 @@ function CommemorationManager() {
   };
 
   const handleDeleteCommemoration = async (id) => {
-    if (!confirm("Удалить эту запись (одно имя)?")) return;
     try {
       await apiOrThrow(`/commemorations/${id}`, { method: "DELETE" });
       setEditingId(null);
@@ -975,6 +1140,8 @@ function OrderManager() {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({});
+  const [orderDetail, setOrderDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -985,16 +1152,25 @@ function OrderManager() {
 
   useEffect(() => { load(); }, [load]);
 
-  const startEdit = (order) => {
+  const startEdit = async (order) => {
     setEditingId(order.id);
+    setOrderDetail(null);
+    setDetailLoading(true);
     setEditValues({
       user_email: order.user_email || "",
       ordered_at: order.ordered_at ? order.ordered_at.slice(0, 10) : "",
       need_receipt: order.need_receipt || false,
     });
+    const full = await api(`/orders/${order.id}`);
+    setOrderDetail(full);
+    setDetailLoading(false);
   };
 
   const saveEdit = async (id) => {
+    if (editValues.need_receipt && !editValues.user_email?.trim()) {
+      alert("При включённом «Уведомить» укажите email.");
+      return;
+    }
     try {
       await apiOrThrow(`/orders/${id}`, {
         method: "PATCH",
@@ -1005,14 +1181,19 @@ function OrderManager() {
         }),
       });
       setEditingId(null);
+      setOrderDetail(null);
       load();
     } catch (e) {
       alert(e.message);
     }
   };
 
+  const closeEdit = () => {
+    setEditingId(null);
+    setOrderDetail(null);
+  };
+
   const handleDelete = async (id) => {
-    if (!confirm(`Удалить записку #${id}? Имена останутся в базе.`)) return;
     try {
       await apiOrThrow(`/orders/${id}`, { method: "DELETE" });
       load();
@@ -1034,10 +1215,46 @@ function OrderManager() {
               borderLeft: `3px solid ${T.gold}`, padding: "8px 12px",
             }}>
               {editingId === order.id ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <div style={{ color: T.dim, fontSize: 11 }}>
-                    Записка #{order.id} · {order.source_channel}
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", color: T.dim, fontSize: 11 }}>
+                    <div>
+                      Записка #{order.id} · {orderDetail?.source_channel ?? order.source_channel}
+                    </div>
+                    <button
+                      onClick={() => handleDelete(order.id)}
+                      style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}
+                      title="Удалить записку"
+                    >
+                      <Icon d={Icons.trash} size={14} color={T.red + "aa"} />
+                    </button>
                   </div>
+
+                  {/* Все поля заказа (только для чтения, кроме редактируемых) */}
+                  <div style={{
+                    display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
+                    padding: 10, background: T.bg, borderRadius: 8, border: `1px solid ${T.border}`,
+                  }}>
+                    <div><span style={{ color: T.dim, fontSize: 10 }}>ID</span><div style={{ color: T.text, fontSize: 12 }}>{order.id}</div></div>
+                    <div><span style={{ color: T.dim, fontSize: 10 }}>Канал</span><div style={{ color: T.text, fontSize: 12 }}>{orderDetail?.source_channel ?? order.source_channel}</div></div>
+                    <div><span style={{ color: T.dim, fontSize: 10 }}>external_id</span><div style={{ color: T.text, fontSize: 12 }}>{orderDetail?.external_id ?? order.external_id ?? "—"}</div></div>
+                    <div><span style={{ color: T.dim, fontSize: 10 }}>Создана</span><div style={{ color: T.text, fontSize: 12 }}>{orderDetail?.created_at?.slice(0, 10) ?? order.created_at?.slice(0, 10) ?? "—"}</div></div>
+                  </div>
+
+                  {/* Исходный текст */}
+                  {(orderDetail?.source_raw != null && orderDetail.source_raw !== "") && (
+                    <div>
+                      <div style={{ color: T.dim, fontSize: 10, marginBottom: 4 }}>Исходный текст</div>
+                      <pre style={{
+                        margin: 0, padding: 10, background: T.bg, borderRadius: 8, border: `1px solid ${T.border}`,
+                        color: T.text, fontSize: 12, whiteSpace: "pre-wrap", wordBreak: "break-word",
+                        fontFamily: "'JetBrains Mono', monospace", maxHeight: 120, overflow: "auto",
+                      }}>
+                        {orderDetail.source_raw}
+                      </pre>
+                    </div>
+                  )}
+
+                  {/* Редактируемые поля */}
                   <div>
                     <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>Email</div>
                     <input
@@ -1060,17 +1277,71 @@ function OrderManager() {
                   }}>
                     <input type="checkbox" checked={editValues.need_receipt}
                       onChange={e => setEditValues(v => ({ ...v, need_receipt: e.target.checked }))} />
-                    Нужна квитанция
+                    Уведомить
                   </label>
+                  {editValues.need_receipt && (
+                    <div style={{ marginTop: -4 }}>
+                      <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>
+                        Email <span style={{ color: T.red }}>*</span>
+                      </div>
+                      <input
+                        type="email"
+                        value={editValues.user_email}
+                        onChange={e => setEditValues(v => ({ ...v, user_email: e.target.value }))}
+                        placeholder="обязательно для уведомления"
+                        style={{ ...inputSt, width: "100%", borderColor: !editValues.user_email?.trim() ? T.red + "88" : undefined }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Список извлечённых имён */}
+                  {detailLoading ? (
+                    <div style={{ color: T.dim, fontSize: 11 }}>Загрузка имён…</div>
+                  ) : orderDetail?.commemorations?.length > 0 ? (
+                    <div>
+                      <div style={{ color: T.dim, fontSize: 10, marginBottom: 6 }}>
+                        Извлечённые имена ({orderDetail.commemorations.length})
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 200, overflow: "auto" }}>
+                        {orderDetail.commemorations.map((c, idx) => (
+                          <div key={c.id} style={{
+                            display: "flex", alignItems: "center", gap: 6,
+                            padding: "6px 10px", background: T.bg, borderRadius: 6,
+                            borderLeft: `3px solid ${c.order_type === "здравие" ? T.green : T.red}`,
+                          }}>
+                            {c.position != null && (
+                              <span style={{ color: T.dim, fontSize: 10, minWidth: 20 }}>#{c.position}</span>
+                            )}
+                            {c.prefix && <span style={{ color: T.dim, fontSize: 11, fontStyle: "italic" }}>{c.prefix}</span>}
+                            <span style={{ color: T.text, fontFamily: "'Cormorant Garamond', serif", fontSize: 14 }}>
+                              {c.genitive_name || c.canonical_name}
+                            </span>
+                            {c.suffix && <span style={{ color: T.dim, fontSize: 11, fontStyle: "italic" }}>{c.suffix}</span>}
+                            <span style={{ marginLeft: "auto", fontSize: 10, color: T.dim }}>
+                              {c.order_type} · {c.period_type}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : orderDetail && !detailLoading ? (
+                    <div style={{ color: T.dim, fontSize: 11 }}>Нет извлечённых имён</div>
+                  ) : null}
+
                   <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                    <button onClick={() => setEditingId(null)} style={{
+                    <button onClick={closeEdit} style={{
                       padding: "4px 10px", borderRadius: 5, border: `1px solid ${T.border}`,
                       background: "transparent", color: T.dim, cursor: "pointer", fontSize: 11,
                     }}>Отмена</button>
-                    <button onClick={() => saveEdit(order.id)} style={{
-                      padding: "4px 10px", borderRadius: 5, border: "none",
-                      background: T.gold, color: T.bg, cursor: "pointer", fontSize: 11, fontWeight: 700,
-                    }}>Сохранить</button>
+                    <button
+                      onClick={() => saveEdit(order.id)}
+                      disabled={editValues.need_receipt && !editValues.user_email?.trim()}
+                      style={{
+                        padding: "4px 10px", borderRadius: 5, border: "none",
+                        background: T.gold, color: T.bg, cursor: "pointer", fontSize: 11, fontWeight: 700,
+                        opacity: editValues.need_receipt && !editValues.user_email?.trim() ? 0.5 : 1,
+                      }}
+                    >Сохранить</button>
                   </div>
                 </div>
               ) : (
@@ -1078,7 +1349,7 @@ function OrderManager() {
                   <div>
                     <span style={{ color: T.dim, marginRight: 6 }}>#{order.id}</span>
                     <span style={{ color: T.text }}>{order.user_email || "—"}</span>
-                    {order.need_receipt && <Badge color={T.blue} style={{ marginLeft: 6 }}>квитанция</Badge>}
+                    {order.need_receipt && <Badge color={T.blue} style={{ marginLeft: 6 }}>уведомить</Badge>}
                     <div style={{ color: T.dim, fontSize: 10, marginTop: 2 }}>
                       {order.source_channel}
                       {order.ordered_at ? ` · ${order.ordered_at.slice(0, 10)}` : ""}
@@ -1107,6 +1378,204 @@ function OrderManager() {
   );
 }
 
+function PersonManager() {
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editValues, setEditValues] = useState({});
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const q = search.trim() ? `&q=${encodeURIComponent(search.trim())}` : "";
+    const data = await api(`/persons?limit=200${q}`);
+    if (data) {
+      setItems(data.items || []);
+      setTotal(data.total ?? data.items?.length ?? 0);
+    }
+    setLoading(false);
+  }, [search]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const startEdit = (p) => {
+    setEditingId(p.id);
+    setEditValues({
+      canonical_name: p.canonical_name || "",
+      genitive_name: p.genitive_name ?? "",
+      gender: p.gender ?? "",
+      name_variants: (p.name_variants || []).join(", "),
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditValues({});
+    setError(null);
+  };
+
+  const saveEdit = async (id) => {
+    setError(null);
+    const canonical = editValues.canonical_name?.trim();
+    if (!canonical) {
+      setError("Имя (именительный падеж) не может быть пустым.");
+      return;
+    }
+    const variantsStr = editValues.name_variants || "";
+    const name_variants = variantsStr.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    try {
+      await apiOrThrow(`/persons/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          canonical_name: canonical,
+          genitive_name: editValues.genitive_name?.trim() || null,
+          gender: editValues.gender?.trim() || null,
+          name_variants,
+        }),
+      });
+      setEditingId(null);
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const handleDelete = async (id, canonicalName) => {
+    setError(null);
+    try {
+      await apiOrThrow(`/persons/${id}`, { method: "DELETE" });
+      setEditingId(null);
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const inputSt = { ...InputStyle(), padding: "6px 10px", fontSize: 12 };
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12, display: "flex", gap: 8, alignItems: "center" }}>
+        <input
+          type="text"
+          placeholder="Поиск по имени..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && load()}
+          style={{ ...inputSt, flex: 1, maxWidth: 280 }}
+        />
+        <button onClick={load} style={{
+          padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer",
+          background: T.gold, color: T.bg, fontSize: 12, fontWeight: 600,
+          fontFamily: "'JetBrains Mono', monospace",
+        }}>Найти</button>
+      </div>
+      {error && (
+        <div style={{ color: T.red, fontSize: 12, marginBottom: 8 }}>✗ {error}</div>
+      )}
+      <div style={{ color: T.dim, fontSize: 11, marginBottom: 8 }}>
+        Всего записей: {total}
+      </div>
+      {loading ? <Loading /> : (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+          {items.length === 0 && <Empty msg="Нет записей" />}
+          {items.map(p => (
+            <div key={p.id} style={{
+              background: T.card, borderRadius: 8, marginBottom: 6,
+              borderLeft: `3px solid ${T.purple}`, padding: "10px 12px",
+            }}>
+              {editingId === p.id ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div>
+                    <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>Имя (именительный)</div>
+                    <input
+                      value={editValues.canonical_name}
+                      onChange={e => setEditValues(v => ({ ...v, canonical_name: e.target.value }))}
+                      style={{ ...inputSt, width: "100%" }}
+                      placeholder="Николай"
+                    />
+                  </div>
+                  <div>
+                    <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>Родительный падеж</div>
+                    <input
+                      value={editValues.genitive_name}
+                      onChange={e => setEditValues(v => ({ ...v, genitive_name: e.target.value }))}
+                      style={{ ...inputSt, width: "100%" }}
+                      placeholder="Николая"
+                    />
+                  </div>
+                  <div>
+                    <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>Пол</div>
+                    <select
+                      value={editValues.gender}
+                      onChange={e => setEditValues(v => ({ ...v, gender: e.target.value }))}
+                      style={{ ...inputSt, width: "100%" }}
+                    >
+                      <option value="">—</option>
+                      <option value="м">м</option>
+                      <option value="ж">ж</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>Варианты написания (через запятую)</div>
+                    <input
+                      value={editValues.name_variants}
+                      onChange={e => setEditValues(v => ({ ...v, name_variants: e.target.value }))}
+                      style={{ ...inputSt, width: "100%" }}
+                      placeholder="Николая, Николай"
+                    />
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={cancelEdit} style={{
+                      padding: "6px 12px", borderRadius: 6, border: `1px solid ${T.border}`,
+                      background: "transparent", color: T.dim, cursor: "pointer", fontSize: 11,
+                    }}>Отмена</button>
+                    <button onClick={() => saveEdit(p.id)} style={{
+                      padding: "6px 12px", borderRadius: 6, border: "none",
+                      background: T.gold, color: T.bg, cursor: "pointer", fontSize: 11, fontWeight: 700,
+                    }}>Сохранить</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div>
+                    <span style={{ color: T.dim, marginRight: 8 }}>#{p.id}</span>
+                    <span style={{ color: T.text, fontFamily: "'Cormorant Garamond', serif", fontSize: 16 }}>
+                      {p.canonical_name}
+                    </span>
+                    {p.genitive_name && (
+                      <span style={{ color: T.dim, marginLeft: 8, fontSize: 12 }}>({p.genitive_name})</span>
+                    )}
+                    {p.gender && <Badge color={T.purple} style={{ marginLeft: 8 }}>{p.gender}</Badge>}
+                    {p.name_variants?.length > 0 && (
+                      <div style={{ color: T.dim, fontSize: 10, marginTop: 4 }}>
+                        Варианты: {p.name_variants.join(", ")}
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => startEdit(p)} style={{
+                    background: "transparent", border: "none", cursor: "pointer", padding: 4,
+                  }} title="Редактировать">
+                    <Icon d={Icons.pencil} size={16} color={T.dim} />
+                  </button>
+                  <button onClick={() => handleDelete(p.id, p.canonical_name)} style={{
+                    background: "transparent", border: "none", cursor: "pointer", padding: 4,
+                  }} title="Удалить из словаря">
+                    <Icon d={Icons.trash} size={16} color={T.red + "aa"} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DbManagePage() {
   const [section, setSection] = useState("commemorations");
 
@@ -1120,6 +1589,7 @@ function DbManagePage() {
         {[
           { id: "commemorations", label: "Поминовения" },
           { id: "orders", label: "Записки" },
+          { id: "persons", label: "Словарь имён" },
         ].map(s => (
           <button key={s.id} onClick={() => setSection(s.id)} style={{
             flex: 1, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer",
@@ -1132,6 +1602,7 @@ function DbManagePage() {
 
       {section === "commemorations" && <CommemorationManager />}
       {section === "orders" && <OrderManager />}
+      {section === "persons" && <PersonManager />}
     </div>
   );
 }
