@@ -80,16 +80,16 @@ function Connector({ label, sublabel, color = C.dim }) {
 // ─── Flow Example ─────────────────────────────────────────
 function FlowExample() {
   const steps = [
-    { label: "CSV строка", color: C.cyan, content: '"Ангелины Анны отр.Тимофея" / Сорокоуст / О здравии' },
-    { label: "Order", color: C.blue, content: 'user_email: null · source: csv · external_id: 17493406:8193284192' },
-    { label: "Name Parser", color: C.purple, content: '→ Ангелина, Анна, Тимофей [отрок]' },
+    { label: "CSV строка / форма", color: C.cyan, content: '"Ангелины Анны отр.Тимофея" / Сорокоуст / О здравии · user_email при «Известить о принятии»' },
+    { label: "Order", color: C.blue, content: 'user_email · need_receipt · source: csv|form · external_id' },
+    { label: "Name Parser", color: C.purple, content: '→ Ангелина, Анна, Тимофей [отрок] + suffix «со чадом»' },
     { label: "3× Commemoration", color: C.orange, content: '' },
   ];
 
   const comms = [
-    { name: "Ангелина", prefix: null, type: "здравие", period: "сорокоуст", expires: "2026-04-05" },
-    { name: "Анна", prefix: null, type: "здравие", period: "сорокоуст", expires: "2026-04-05" },
-    { name: "Тимофей", prefix: "отрок", type: "здравие", period: "сорокоуст", expires: "2026-04-05" },
+    { name: "Ангелина", prefix: null, suffix: null, type: "здравие", period: "сорокоуст", expires: "2026-04-05" },
+    { name: "Анна", prefix: null, suffix: null, type: "здравие", period: "сорокоуст", expires: "2026-04-05" },
+    { name: "Тимофей", prefix: "отр.", suffix: "со чадом", type: "здравие", period: "сорокоуст", expires: "2026-04-05" },
   ];
 
   return (
@@ -122,6 +122,7 @@ function FlowExample() {
             <span style={{ color: C.text, fontSize: 13, fontFamily: serif, fontWeight: 700, minWidth: 80 }}>
               {c.prefix && <span style={{ color: C.dim, fontSize: 10, fontStyle: "italic" }}>{c.prefix} </span>}
               {c.name}
+              {c.suffix && <span style={{ color: C.dim, fontSize: 10, fontStyle: "italic" }}> {c.suffix}</span>}
             </span>
             <Badge color={C.green}>{c.type}</Badge>
             <Badge color={C.gold}>{c.period}</Badge>
@@ -276,6 +277,8 @@ export default function ModelDiagram() {
               fields={[
                 { name: "id", type: "serial", pk: true },
                 { name: "canonical_name", type: "varchar(100) UNIQUE", highlight: true },
+                { name: "genitive_name", type: "varchar(100)" },
+                { name: "gender", type: "м | ж" },
                 { name: "name_variants", type: "text[]" },
                 { name: "embedding", type: "vector(384)" },
                 { name: "created_at", type: "timestamptz" },
@@ -299,10 +302,12 @@ export default function ModelDiagram() {
                 { name: "order_id", type: "→ orders.id", fk: true },
                 { name: "order_type", type: "здравие | упокоение", highlight: true },
                 { name: "period_type", type: "разовое | сорокоуст | полгода | год", highlight: true },
-                { name: "prefix", type: "воин, отрок, мл., нп." },
+                { name: "prefix", type: "в., нпр., мл., иер. уб." },
+                { name: "suffix", type: "со чадом | со чады" },
                 { name: "ordered_at", type: "timestamptz", highlight: true },
                 { name: "starts_at", type: "timestamptz", highlight: true },
                 { name: "expires_at", type: "timestamptz", highlight: true },
+                { name: "position", type: "integer" },
                 { name: "is_active", type: "boolean" },
                 { name: "created_at", type: "timestamptz" },
               ]}
@@ -321,9 +326,11 @@ export default function ModelDiagram() {
               fields={[
                 { name: "id", type: "serial", pk: true },
                 { name: "user_email", type: "varchar(255)", highlight: true },
+                { name: "need_receipt", type: "boolean" },
                 { name: "source_channel", type: "csv | form | api" },
                 { name: "source_raw", type: "text" },
                 { name: "external_id", type: "varchar(100) UNIQUE" },
+                { name: "ordered_at", type: "timestamptz" },
                 { name: "created_at", type: "timestamptz" },
               ]}
             />
@@ -350,14 +357,19 @@ export default function ModelDiagram() {
         {tab === "api" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {[
-              { method: "POST", path: "/api/v1/upload/csv", desc: "Загрузка CSV → N commemorations", color: C.green },
-              { method: "POST", path: "/api/v1/orders", desc: "Ручная записка. Body: order_type, period_type, names_text, user_email, starts_at", color: C.green },
-              { method: "GET", path: "/api/v1/names/today", desc: "Активные commemorations на сегодня. Filter: ?order_type=здравие", color: C.blue },
-              { method: "GET", path: "/api/v1/names/search?q=Нико", desc: "Fuzzy-поиск по Person (trigram + vector)", color: C.blue },
+              { method: "POST", path: "/api/v1/upload/csv", desc: "Загрузка CSV → N commemorations. Query: delimiter, starts_at", color: C.green },
+              { method: "POST", path: "/api/v1/orders", desc: "Ручная записка. Body: order_type, period_type, names_text, user_email (при «Известить о принятии»), need_receipt, starts_at", color: C.green },
+              { method: "GET", path: "/api/v1/orders", desc: "Список заказов (limit, offset)", color: C.blue },
+              { method: "PATCH", path: "/api/v1/orders/{id}", desc: "Редактирование заказа (user_email, ordered_at, need_receipt)", color: C.blue },
+              { method: "DELETE", path: "/api/v1/orders/{id}", desc: "Удаление заказа", color: C.red },
+              { method: "GET", path: "/api/v1/commemorations", desc: "Список поминовений для управления. Query: no_start_date, limit, offset", color: C.blue },
+              { method: "PATCH", path: "/api/v1/commemorations/{id}", desc: "Редактирование записи: prefix, suffix, order_type, period_type, starts_at (expires_at пересчитывается)", color: C.orange },
+              { method: "DELETE", path: "/api/v1/commemorations/{id}", desc: "Удаление одной записи (одно имя)", color: C.red },
+              { method: "POST", path: "/api/v1/commemorations/bulk-update", desc: "Массовая установка starts_at для списка id (expires_at пересчитывается)", color: C.orange },
+              { method: "GET", path: "/api/v1/names/today", desc: "Активные commemorations на сегодня. Query: order_type", color: C.blue },
+              { method: "GET", path: "/api/v1/names/search?q=...", desc: "Fuzzy-поиск по Person (trigram + vector)", color: C.blue },
               { method: "GET", path: "/api/v1/names/stats", desc: "Статистика: total, active, by_type, by_period", color: C.blue },
-              { method: "GET", path: "/api/v1/names/by-user?email=...", desc: "Все commemorations конкретного заказчика", color: C.blue },
-              { method: "PATCH", path: "/api/v1/commemorations/{id}/deactivate", desc: "Soft-delete одной записи", color: C.orange },
-              { method: "DELETE", path: "/api/v1/commemorations/{id}", desc: "Hard-delete одной записи", color: C.red },
+              { method: "GET", path: "/api/v1/names/by-user?email=...", desc: "Поминовения заказчика по email", color: C.blue },
             ].map((e, i) => (
               <div key={i} style={{
                 background: C.card, borderRadius: 8, padding: "10px 12px",

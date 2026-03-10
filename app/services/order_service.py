@@ -35,6 +35,14 @@ logger = logging.getLogger(__name__)
 
 # ─── Dedup helpers ──────────────────────────────────────────────────
 
+def _norm_opt_str(val: str | None, max_len: int = 100) -> str | None:
+    """Нормализация prefix/suffix для БД: str или None, не длиннее max_len."""
+    if val is None:
+        return None
+    s = str(val).strip() if isinstance(val, str) else str(val)
+    return s[:max_len] if s else None
+
+
 def _make_external_id(date_str: str, content: str) -> str:
     """Deterministic hash for deduplication: sha256(date|content)[:64]."""
     payload = f"{date_str}|{content.strip()}"
@@ -66,35 +74,15 @@ async def find_or_create_person(
     if person:
         return person
 
-    # 2. Trigram similarity
+    # 2. Trigram similarity (в savepoint — при ошибке не ломаем основную транзакцию)
     try:
-        result = await db.execute(
-            select(Person)
-            .where(text("similarity(canonical_name, :name) > 0.6"))
-            .params(name=canonical)
-            .order_by(text("similarity(canonical_name, :name) DESC"))
-            .params(name=canonical)
-            .limit(1)
-        )
-        person = result.scalar_one_or_none()
-        if person:
-            if canonical not in (person.name_variants or []):
-                person.name_variants = list(person.name_variants or []) + [canonical]
-            return person
-    except Exception:
-        pass
-
-    # 3. Vector similarity
-    embedding = await embed_name_async(canonical)
-    if embedding:
-        try:
+        async with db.begin_nested():
             result = await db.execute(
                 select(Person)
-                .where(text(
-                    "embedding IS NOT NULL AND "
-                    "1 - (embedding <=> :vec::vector) > :threshold"
-                ))
-                .params(vec=str(embedding), threshold=settings.dedup_threshold)
+                .where(text("similarity(canonical_name, :name) > 0.6"))
+                .params(name=canonical)
+                .order_by(text("similarity(canonical_name, :name) DESC"))
+                .params(name=canonical)
                 .limit(1)
             )
             person = result.scalar_one_or_none()
@@ -102,8 +90,30 @@ async def find_or_create_person(
                 if canonical not in (person.name_variants or []):
                     person.name_variants = list(person.name_variants or []) + [canonical]
                 return person
+    except Exception as e:
+        logger.warning("Trigram similarity search failed (pg_trgm?): %s", e)
+
+    # 3. Vector similarity (в savepoint)
+    embedding = await embed_name_async(canonical)
+    if embedding:
+        try:
+            async with db.begin_nested():
+                result = await db.execute(
+                    select(Person)
+                    .where(text(
+                        "embedding IS NOT NULL AND "
+                        "1 - (embedding <=> :vec::vector) > :threshold"
+                    ))
+                    .params(vec=str(embedding), threshold=settings.dedup_threshold)
+                    .limit(1)
+                )
+                person = result.scalar_one_or_none()
+                if person:
+                    if canonical not in (person.name_variants or []):
+                        person.name_variants = list(person.name_variants or []) + [canonical]
+                    return person
         except Exception as e:
-            logger.debug(f"Vector search failed: {e}")
+            logger.warning("Vector similarity search failed (embedding format/API?): %s", e)
 
     # 4. Create new (safe against concurrent inserts)
     genitive = parsed.genitive if hasattr(parsed, "genitive") else None
@@ -211,8 +221,8 @@ async def process_row(
             order_id=order.id,
             order_type=order_type,
             period_type=period_type,
-            prefix=parsed_name.prefix,
-            suffix=parsed_name.suffix,
+            prefix=_norm_opt_str(parsed_name.prefix),
+            suffix=_norm_opt_str(parsed_name.suffix),
             ordered_at=ordered_at,
             starts_at=starts_at,
             expires_at=expires_at,
@@ -335,8 +345,8 @@ async def create_manual_order(
             order_id=order.id,
             order_type=otype,
             period_type=ptype,
-            prefix=parsed_name.prefix,
-            suffix=parsed_name.suffix,
+            prefix=_norm_opt_str(parsed_name.prefix),
+            suffix=_norm_opt_str(parsed_name.suffix),
             ordered_at=ordered_at,
             starts_at=starts_at,
             expires_at=exp,

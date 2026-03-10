@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -10,6 +11,7 @@ from app.models import Order
 from app.services.order_service import create_manual_order
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class OrderCreate(BaseModel):
@@ -41,6 +43,9 @@ async def create_order(body: OrderCreate, db: AsyncSession = Depends(get_db)):
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Create order failed")
+        raise HTTPException(status_code=500, detail=str(e))
 
     return {
         "order_id": comms[0].order_id if comms else None,
