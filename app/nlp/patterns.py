@@ -184,7 +184,7 @@ PREFIX_MAP: dict[str, str] = {
 # None = gender not implied by prefix alone (resolved from name itself)
 
 PREFIX_GENDER_HINTS: dict[str, str | None] = {
-    "в.":         "м",
+    "в.":         None,
     "мл.":        None,
     "отр.":       None,   # отрок→м or отроковица→ж, resolved by name
     "нпр.":       None,

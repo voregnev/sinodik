@@ -66,6 +66,7 @@ services:
       ollama:
         condition: service_healthy
     environment:
+      PYTHONPATH: /app
       SINODIK_DATABASE_URL: postgresql+asyncpg://sinodik:sinodik@db:5432/sinodik
       SINODIK_DATABASE_URL_SYNC: postgresql://sinodik:sinodik@db:5432/sinodik
       SINODIK_CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000","http://localhost"]'
@@ -80,6 +81,9 @@ services:
       - "8000:8000"
     volumes:
       - ./app:/app
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+      - ./tests:/app/tests
 
   # ─── Nginx — serve PWA + reverse proxy API ──────
   nginx:

@@ -85,7 +85,7 @@ class TestFullExtraction:
         result = extract_names("воина Николая")
         assert len(result) == 1
         assert result[0].canonical == "Николай"
-        assert result[0].prefix == "воин"
+        assert result[0].prefix == "в."
 
     def test_mixed_with_prefix_otrok(self):
         """Ангелины Анны Елисаветы отр.Тимофея — gen context, prefix отрок."""
@@ -94,7 +94,7 @@ class TestFullExtraction:
         assert pairs == [
             ("Ангелина", "ж"), ("Анна", "ж"), ("Елисавета", "ж"), ("Тимофей", "м"),
         ]
-        assert result[3].prefix == "отрок"
+        assert result[3].prefix == "отр."
 
     def test_prefix_bolyashchey(self):
         """болящей Евгении — prefix hint → женский."""
