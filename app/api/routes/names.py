@@ -10,8 +10,8 @@ import os
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.services.query_service import get_active_today, search_names, get_stats, get_by_user
+from database import get_db
+from services.query_service import get_active_today, search_names, get_stats, get_by_user
 
 router = APIRouter()
 
@@ -66,8 +66,12 @@ async def names_today_pdf(
     from reportlab.pdfbase.ttfonts import TTFont
 
     # ── Unicode-шрифт для кириллицы ────────────────────────────────────────
-    # Можно переопределить путь через SINODIK_PDF_FONT_PATH (например, DejaVuSans.ttf)
+    # В Docker содержимое app смонтировано в /app → шрифты в /app/fonts
     font_path_env = os.getenv("SINODIK_PDF_FONT_PATH")
+    _fonts_dirs = [
+        Path("/app/fonts"),
+        Path(__file__).resolve().parent.parent / "fonts",  # локально: app/fonts
+    ]
     font_name_main = "SinodikMain"
     font_name_bold = "SinodikMain-Bold"
 
@@ -75,13 +79,13 @@ async def names_today_pdf(
         candidates: list[Path] = []
         if font_path_env:
             candidates.append(Path(font_path_env))
-        # Частые пути для DejaVu Sans в Linux-контейнерах
-        candidates.extend(
-            [
-                Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-                Path("/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf"),
-            ]
-        )
+        for d in _fonts_dirs:
+            candidates.append(d / "DejaVuSans.ttf")
+            candidates.append(d / "DejaVuSansCondensed.ttf")
+        candidates.extend([
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf"),
+        ])
         main_font_file = next((p for p in candidates if p.is_file()), None)
         if not main_font_file:
             return False
@@ -92,6 +96,8 @@ async def names_today_pdf(
             main_font_file.with_name("DejaVuSans-Bold.ttf"),
             main_font_file.with_name("DejaVuSansCondensed-Bold.ttf"),
         ]
+        for d in _fonts_dirs:
+            bold_candidates.append(d / "DejaVuSans-Bold.ttf")
         bold_font_file = next((p for p in bold_candidates if p.is_file()), main_font_file)
         pdfmetrics.registerFont(TTFont(font_name_bold, str(bold_font_file)))
         return True

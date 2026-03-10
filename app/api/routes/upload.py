@@ -3,8 +3,8 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, UploadFile, File, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.services.order_service import process_csv_upload
+from database import get_db
+from services.order_service import process_csv_upload
 
 router = APIRouter()
 

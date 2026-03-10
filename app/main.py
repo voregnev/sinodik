@@ -9,9 +9,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.config import settings
-from app.database import engine, Base
-from app.api.routes import upload, orders, names, health, commemorations, persons
+from config import settings
+from database import engine, Base
+from api.routes import upload, orders, names, health, commemorations, persons
 
 
 @asynccontextmanager

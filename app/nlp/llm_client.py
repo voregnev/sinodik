@@ -5,7 +5,7 @@ LLM fallback: OpenAI-compatible API for names that the regex pipeline couldn't p
 import json
 import logging
 
-from app.config import settings
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ async def llm_parse_names(text: str):
 
         data = json.loads(response.choices[0].message.content)
 
-        from app.nlp.name_extractor import ParsedName
+        from nlp.name_extractor import ParsedName
         return [
             ParsedName(
                 raw=item.get("canonical", ""),

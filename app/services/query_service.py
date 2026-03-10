@@ -15,9 +15,9 @@ from datetime import date, datetime
 from sqlalchemy import select, func, text, and_, case, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Person, Order, Commemoration
-from app.services.embedding_service import embed_name_async
-from app.services.period_calculator import calculate_expires_at
+from models import Person, Order, Commemoration
+from services.embedding_service import embed_name_async
+from services.period_calculator import calculate_expires_at
 
 
 # ═══════════════════════════════════════════════════════════

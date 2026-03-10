@@ -9,8 +9,8 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.models import Person
+from database import get_db
+from models import Person
 
 router = APIRouter()
 

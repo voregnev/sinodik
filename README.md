@@ -181,10 +181,12 @@ Two-pass pipeline обработки текстового поля:
 
 ## Тесты
 
+Тесты запускаются только из Docker (в образе код лежит в `/app`, тесты в `/app/tests`):
+
 ```bash
-# Запуск тестов
-pytest tests/ -v
+# Все тесты
+docker compose run --rm api pytest tests/ -v
 
 # Только парсер имён
-pytest tests/test_name_extractor.py -v
+docker compose run --rm api pytest tests/test_name_extractor.py -v
 ```

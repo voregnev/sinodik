@@ -20,8 +20,8 @@ Sinodic is a church commemoration management system. It processes CSV files from
 # Start all services
 docker compose up -d
 
-# Run tests
-pytest tests/ -v
+# Run tests (from Docker only)
+docker compose run --rm api pytest tests/ -v
 
 # Run migrations
 docker compose exec api alembic upgrade head

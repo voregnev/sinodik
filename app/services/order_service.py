@@ -19,17 +19,17 @@ from sqlalchemy import select, text, func
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Person, Order, Commemoration
-from app.nlp import extract_names, ParsedName, llm_parse_names
-from app.nlp.names_dict import is_ambiguous
-from app.services.csv_parser import CsvRow, parse_csv
-from app.services.period_calculator import (
+from models import Person, Order, Commemoration
+from nlp import extract_names, ParsedName, llm_parse_names
+from nlp.names_dict import is_ambiguous
+from services.csv_parser import CsvRow, parse_csv
+from services.period_calculator import (
     calculate_expires_at,
     normalize_period_type,
     normalize_order_type,
 )
-from app.services.embedding_service import embed_name_async
-from app.config import settings
+from services.embedding_service import embed_name_async
+from config import settings
 
 logger = logging.getLogger(__name__)
 

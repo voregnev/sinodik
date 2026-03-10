@@ -5,10 +5,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.models import Commemoration
-from app.services.query_service import get_commemorations, bulk_set_starts_at
-from app.services.period_calculator import (
+from database import get_db
+from models import Commemoration
+from services.query_service import get_commemorations, bulk_set_starts_at
+from services.period_calculator import (
     calculate_expires_at,
     normalize_period_type,
 )

@@ -6,9 +6,9 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.models import Order, Commemoration, Person
-from app.services.order_service import create_manual_order, refill_order_commemorations
+from database import get_db
+from models import Order, Commemoration, Person
+from services.order_service import create_manual_order, refill_order_commemorations
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

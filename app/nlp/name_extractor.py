@@ -35,7 +35,7 @@ Name extraction pipeline v2.
 import re
 from dataclasses import dataclass
 
-from app.nlp.patterns import (
+from nlp.patterns import (
     PREFIX_MAP,
     PREFIX_RE,
     PREFIX_GENDER_HINTS,
@@ -47,7 +47,7 @@ from app.nlp.patterns import (
     VALID_NAME_RE,
     name_has_vowel,
 )
-from app.nlp.names_dict import (
+from nlp.names_dict import (
     NameEntry,
     NOM_INDEX,
     GEN_INDEX,

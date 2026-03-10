@@ -27,11 +27,15 @@ RUN sed -i 's/deb.debian.org/ftp.ru.debian.org/g' /etc/apt/sources.list.d/*.sour
 
 COPY --from=builder /install /usr/local
 
-COPY . .
+COPY requirements.txt .
+COPY app/ .
+COPY alembic/ ./alembic
+COPY alembic.ini .
+COPY tests/ ./tests
 
 RUN chown -R app:app /app
 USER app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

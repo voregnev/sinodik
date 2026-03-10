@@ -5,7 +5,7 @@ Based on verified test cases (all 14 passed) from test.sh.
 """
 
 import pytest
-from app.nlp.name_extractor import extract_names, _detect_case_context, ParsedName
+from nlp.name_extractor import extract_names, _detect_case_context, ParsedName
 
 
 # ═══════════════════════════════════════════════════════════
