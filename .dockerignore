@@ -42,7 +42,7 @@ docker-compose.override.yml
 
 # ── ML model cache (will be downloaded at runtime) ───────
 .cache
-models
+/models
 
 # ── Misc ─────────────────────────────────────────────────
 *.log

@@ -2,7 +2,7 @@ services:
 
   # ─── Traefik reverse proxy с SSL (ACME/Let's Encrypt) ─
   traefik:
-    image: traefik:v3.0
+    image: traefik:latest
     container_name: sinodik-traefik
     restart: unless-stopped
     command:
