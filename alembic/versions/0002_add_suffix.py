@@ -16,17 +16,24 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # suffix: "со чадом", "со чады" — postfix preserved from source text
-    op.add_column('commemorations', sa.Column('suffix', sa.String(100), nullable=True))
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    comm_cols = {c["name"]: c for c in inspector.get_columns("commemorations")}
 
-    # prefix: extend from VARCHAR(50) to VARCHAR(100) to fit double prefixes
-    # e.g. "иер. уб." or "нпр. т.б."
-    op.alter_column(
-        'commemorations', 'prefix',
-        existing_type=sa.String(50),
-        type_=sa.String(100),
-        nullable=True,
-    )
+    # suffix: только если колонки ещё нет (в свежей БД она уже есть из 0001)
+    if "suffix" not in comm_cols:
+        op.add_column("commemorations", sa.Column("suffix", sa.String(100), nullable=True))
+
+    # prefix: расширяем до 100 символов только если сейчас 50
+    if "prefix" in comm_cols:
+        pref_type = comm_cols["prefix"]["type"]
+        if getattr(pref_type, "length", None) == 50:
+            op.alter_column(
+                "commemorations", "prefix",
+                existing_type=sa.String(50),
+                type_=sa.String(100),
+                nullable=True,
+            )
 
 
 def downgrade() -> None:

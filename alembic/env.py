@@ -13,7 +13,7 @@ from alembic import context
 
 from config import settings
 from database import Base
-from models import Person, Order, Commemoration  # noqa: F401 — register models
+from models.models import Person, Order, Commemoration  # noqa: F401 — register models
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url_sync)
