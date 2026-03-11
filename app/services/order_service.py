@@ -61,7 +61,7 @@ async def find_or_create_person(
 
     Search priority:
     1. Exact match on canonical_name
-    2. pg_trgm similarity > 0.6
+    2. pg_trgm similarity > 0.8
     3. pgvector cosine similarity > threshold
     4. Create new
     """
@@ -123,7 +123,7 @@ async def find_or_create_person(
         async with db.begin_nested():
             result = await db.execute(
                 select(Person)
-                .where(text("similarity(canonical_name, :name) > 0.6"))
+                .where(text("similarity(canonical_name, :name) > 0.8"))
                 .params(name=canonical)
                 .order_by(text("similarity(canonical_name, :name) DESC"))
                 .params(name=canonical)
