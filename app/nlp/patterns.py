@@ -237,6 +237,13 @@ GENDER_MARKERS_MASC = re.compile(r"\(\s*(?:муж\.?|м\.?)\s*\)", re.IGNORECASE
 
 NAME_DELIMITERS = re.compile(r"[,;/\n\r\t]+")
 
+# ─── Comment boundary: after "р.Б. Имя." often starts comment ─────────
+# Не извлекать имена из комментария (Оплатила..., Напишите..., С Праздником...).
+COMMENT_START_RE = re.compile(
+    r"\.\s+(Оплатил[аи]?|Напишите|С\s+Праздником|пожертвование|Средства\s+пришли|приняли\s+на)",
+    re.IGNORECASE,
+)
+
 # ─── Noise patterns: not names ───────────────────────────────────────
 
 NOISE_PATTERNS = [

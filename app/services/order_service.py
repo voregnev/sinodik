@@ -20,7 +20,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import Person, Order, Commemoration
-from nlp import extract_names, ParsedName, llm_parse_names
+from nlp import extract_names, ParsedName, llm_parse_names, strip_comment_part
 from nlp.names_dict import is_ambiguous
 from services.csv_parser import CsvRow, parse_csv
 from services.period_calculator import (
@@ -237,7 +237,7 @@ async def process_row(
     names = extract_names(row.names_raw)
 
     if row.names_raw and (not names or any(n.confidence < 0.5 for n in names)):
-        llm_names = await llm_parse_names(row.names_raw)
+        llm_names = await llm_parse_names(strip_comment_part(row.names_raw))
         if llm_names:
             names = llm_names
 
@@ -435,7 +435,7 @@ async def refill_order_commemorations(
 
     names = extract_names(order.source_raw)
     if order.source_raw and (not names or any(n.confidence < 0.5 for n in names)):
-        llm_names = await llm_parse_names(order.source_raw)
+        llm_names = await llm_parse_names(strip_comment_part(order.source_raw))
         if llm_names:
             names = llm_names
 

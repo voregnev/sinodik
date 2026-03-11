@@ -40,6 +40,7 @@ from nlp.patterns import (
     PREFIX_RE,
     PREFIX_GENDER_HINTS,
     SUFFIX_RE,
+    COMMENT_START_RE,
     GENDER_MARKERS_FEM,
     GENDER_MARKERS_MASC,
     NAME_DELIMITERS,
@@ -235,6 +236,19 @@ def strip_noise(text: str) -> str:
     return text.strip()
 
 
+def strip_comment_part(text: str) -> str:
+    """
+    Обрезать комментарий после списка имён.
+
+    После «р.Б. Имя.» часто идёт фраза типа «Оплатила с карты...», «Напишите...» —
+    в ней могут быть имена (плательщика), их не нужно извлекать для поминовения.
+    """
+    match = COMMENT_START_RE.search(text)
+    if match:
+        return text[: match.start()].strip()
+    return text
+
+
 # ═══════════════════════════════════════════════════════════
 #  MAIN EXTRACTION FUNCTION
 # ═══════════════════════════════════════════════════════════
@@ -252,6 +266,10 @@ def extract_names(text: str | None) -> list[ParsedName]:
         return []
 
     cleaned = strip_noise(text)
+    if not cleaned:
+        return []
+
+    cleaned = strip_comment_part(cleaned)
     if not cleaned:
         return []
 
