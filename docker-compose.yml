@@ -21,6 +21,8 @@ services:
       retries: 5
 
   # ─── Ollama (LLM + embeddings) ───────────────────
+  # Ресурсы: qwen2.5:3b ~2–4 GB RAM/VRAM, qwen3-embedding:0.6b ~1 GB.
+  # Рекомендация: минимум 4 GB RAM, с GPU — 4 GB+ VRAM. Лимиты ниже — по желанию.
   ollama:
     image: ollama/ollama
     container_name: sinodik-ollama
@@ -32,6 +34,12 @@ services:
       - ollamadata:/root/.ollama
     ports:
       - "11434:11434"
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 6G
+    #     reservations:
+    #       memory: 2G
     healthcheck:
       test: ["CMD-SHELL", "ollama list"]
       interval: 10s
