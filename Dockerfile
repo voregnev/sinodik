@@ -32,10 +32,12 @@ COPY app/ .
 COPY alembic/ ./alembic
 COPY alembic.ini .
 COPY tests/ ./tests
+COPY scripts/entrypoint.sh /app/scripts/entrypoint.sh
 
-RUN chown -R app:app /app
+RUN chmod +x /app/scripts/entrypoint.sh && chown -R app:app /app
 USER app
 
 EXPOSE 8000
 
+ENTRYPOINT ["/app/scripts/entrypoint.sh"]
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

@@ -10,13 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from config import settings
-from database import engine, Base
+from database import engine
 from api.routes import upload, orders, names, health, commemorations, persons
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create tables on startup (dev mode). Use Alembic in production."""
+    """Ensure extensions exist. Schema is managed by Alembic migrations (run at container start)."""
     async with engine.begin() as conn:
         await conn.execute(
             __import__("sqlalchemy").text("CREATE EXTENSION IF NOT EXISTS vector")
@@ -24,7 +24,6 @@ async def lifespan(app: FastAPI):
         await conn.execute(
             __import__("sqlalchemy").text('CREATE EXTENSION IF NOT EXISTS "pg_trgm"')
         )
-        await conn.run_sync(Base.metadata.create_all)
     yield
     await engine.dispose()
 

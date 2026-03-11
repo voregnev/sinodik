@@ -1,0 +1,6 @@
+# Production override: no volume mounts — use built image only.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  api:
+    volumes: []
