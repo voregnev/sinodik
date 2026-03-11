@@ -27,6 +27,8 @@ services:
     image: ollama/ollama
     container_name: sinodik-ollama
     restart: unless-stopped
+    profiles:
+    - ollama
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -71,8 +73,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      ollama:
-        condition: service_healthy
+      # ollama:
+      #   condition: service_healthy
     environment:
       PYTHONPATH: /app
       SINODIK_DATABASE_URL: postgresql+asyncpg://sinodik:sinodik@db:5432/sinodik
