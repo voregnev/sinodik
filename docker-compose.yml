@@ -1,5 +1,32 @@
 services:
 
+  # ─── Traefik reverse proxy с SSL (ACME/Let's Encrypt) ─
+  traefik:
+    image: traefik:v3.0
+    container_name: sinodik-traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+    networks:
+      - sinodik_network
+    labels:
+      - "traefik.enable=true"
+
   # ─── PostgreSQL 18 + pgvector ────────────────────
   db:
     image: pgvector/pgvector:pg18
@@ -19,6 +46,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    networks:
+      - sinodik_network
 
   # ─── Ollama (LLM + embeddings) ───────────────────
   # Ресурсы: qwen2.5:3b ~2–4 GB RAM/VRAM, qwen3-embedding:0.6b ~1 GB.
@@ -36,6 +65,8 @@ services:
       - ollamadata:/root/.ollama
     ports:
       - "11434:11434"
+    networks:
+      - sinodik_network
     # deploy:
     #   resources:
     #     limits:
@@ -64,6 +95,8 @@ services:
       - 8.8.4.4
     entrypoint: ["/bin/sh", "-c", "ollama pull qwen2.5:3b && ollama pull qwen3-embedding:0.6b"]
     restart: "no"
+    networks:
+      - sinodik_network
 
   # ─── FastAPI Backend ─────────────────────────────
   api:
@@ -79,7 +112,7 @@ services:
       PYTHONPATH: /app
       SINODIK_DATABASE_URL: postgresql+asyncpg://sinodik:sinodik@db:5432/sinodik
       SINODIK_DATABASE_URL_SYNC: postgresql://sinodik:sinodik@db:5432/sinodik
-      SINODIK_CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000","http://localhost"]'
+      SINODIK_CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000","http://localhost","https://${SINODIK_HOST:-sinodik.spyridon.ru}"]'
       SINODIK_OPENAI_BASE_URL: http://ollama:11434/v1
       SINODIK_OPENAI_API_KEY: ollama
       SINODIK_OPENAI_MODEL: qwen2.5:3b
@@ -94,6 +127,8 @@ services:
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
       - ./tests:/app/tests
+    networks:
+      - sinodik_network
 
   # ─── Nginx — serve PWA + reverse proxy API ──────
   nginx:
@@ -102,11 +137,22 @@ services:
     restart: unless-stopped
     depends_on:
       - api
-    ports:
-      - "80:80"
     volumes:
       - ./frontend:/usr/share/nginx/html
       - ./infra/nginx.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - sinodik_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sinodik.rule=Host(`${SINODIK_HOST:-sinodik.spyridon.ru}`)"
+      - "traefik.http.routers.sinodik.entrypoints=websecure"
+      - "traefik.http.routers.sinodik.tls.certresolver=letsencrypt"
+      - "traefik.http.services.sinodik.loadbalancer.server.port=80"
+      - "traefik.http.routers.sinodik.priority=10"
+
+networks:
+  sinodik_network:
+    driver: bridge
 
 volumes:
   pgdata:

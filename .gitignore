@@ -35,6 +35,7 @@ frontend/.cache/
 
 # ── Docker ───────────────────────────────────────────────
 docker-compose.override.yml
+letsencrypt/acme.json
 
 # ── Database ─────────────────────────────────────────────
 *.db
