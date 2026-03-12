@@ -58,3 +58,7 @@ alembic/versions/__pycache__/
 # ── ML models cache (root-level only) ───────────────────
 .cache/
 /models/
+
+.htpasswd
+infra/htpasswd
+infra/nginx-logs

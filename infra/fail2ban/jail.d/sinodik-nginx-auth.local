@@ -1,0 +1,15 @@
+# Jail для системного fail2ban: защита от перебора пароля Basic Auth (nginx).
+# Установка на хост:
+#   sudo cp infra/fail2ban/jail.d/sinodik-nginx-auth.local /etc/fail2ban/jail.d/
+#   sudo systemctl restart fail2ban
+# Логи nginx должны быть на хосте по пути ниже (volume из docker-compose).
+
+[sinodik-nginx-auth]
+enabled  = true
+filter   = nginx-http-auth
+backend  = auto
+port     = http,https
+logpath  = /var/opt/sinodik/infra/nginx-logs/access.log
+maxretry = 5
+findtime = 600
+bantime  = 3600

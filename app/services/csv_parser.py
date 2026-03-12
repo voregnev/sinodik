@@ -49,6 +49,10 @@ def _find_col(headers: dict[str, str], field: str) -> str:
 def parse_csv(content: bytes, delimiter: str = ";") -> list[CsvRow]:
     text = content.decode("utf-8-sig")
 
+    # csv.DictReader требует один символ; пустая строка от ?delimiter= → по умолчанию
+    if not delimiter or len(delimiter) != 1:
+        delimiter = ";"
+
     # Простая авто-детекция разделителя:
     # если по умолчанию ожидаем `;`, но в первой строке только запятые —
     # считаем, что это CSV с запятой.
