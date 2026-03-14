@@ -61,7 +61,11 @@ Plans:
   2. POST /auth/verify-otp with a valid code returns a JWT; with an invalid code returns 401
   3. GET /auth/me with a valid JWT returns the current user's email and role
   4. A user can log out by discarding the JWT client-side; the /auth/me endpoint rejects expired or missing tokens
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — JWT and role dependencies (app/api/deps.py) + minimal test
+- [ ] 03-02-PLAN.md — Auth routes (request-otp, verify-otp, me), router registration, integration tests
 
 ### Phase 4: Protected Routes and Admin Endpoints
 **Goal**: Authenticated users can access their own data, admins can manage all data, and unauthenticated access to protected operations is rejected
@@ -96,6 +100,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Schema and Configuration | 2/2 | Complete   | 2026-03-14 |
 | 2. Auth Service Core | 0/3 | Not started | - |
-| 3. Auth Routes and Dependencies | 0/TBD | Not started | - |
+| 3. Auth Routes and Dependencies | 0/2 | Not started | - |
 | 4. Protected Routes and Admin Endpoints | 0/TBD | Not started | - |
 | 5. Frontend Auth Integration | 0/TBD | Not started | - |
