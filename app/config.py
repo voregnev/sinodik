@@ -31,6 +31,16 @@ class Settings(BaseSettings):
     admin_emails: Union[str, List[str]] = Field(default=[])  # SINODIK_ADMIN_EMAILS (comma-separated)
     otp_plaintext_fallback: bool = False   # SINODIK_OTP_PLAINTEXT_FALLBACK
 
+    # SMTP
+    smtp_host: str = "localhost"           # SINODIK_SMTP_HOST
+    smtp_port: int = 587                   # SINODIK_SMTP_PORT
+    smtp_username: str = ""                # SINODIK_SMTP_USERNAME
+    smtp_password: str = ""                # SINODIK_SMTP_PASSWORD
+    smtp_from_address: str = "noreply@sinodic.local"  # SINODIK_SMTP_FROM_ADDRESS
+    smtp_use_tls: bool = True              # SINODIK_SMTP_USE_TLS
+    smtp_use_ssl: bool = False             # SINODIK_SMTP_USE_SSL
+    smtp_validate_certs: bool = True       # SINODIK_SMTP_VALIDATE_CERTS
+
     @field_validator("admin_emails", mode="before")
     @classmethod
     def parse_admin_emails(cls, v):
