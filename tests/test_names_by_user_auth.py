@@ -129,3 +129,42 @@ def test_by_user_admin_with_email_param_returns_that_users_data():
         assert call_kw["user_email"] == other_email
     finally:
         del app.dependency_overrides[get_current_user]
+
+
+def test_by_user_response_includes_order_id_in_commemorations():
+    """GET /names/by-user response commemorations include order_id for grouping by order."""
+    user_email = "order_id_test@example.com"
+    token = _make_token(user_email, "user")
+    mock_user = MagicMock()
+    mock_user.email = user_email
+    mock_user.role = "user"
+
+    async def override():
+        return mock_user
+
+    mock_commemoration = {
+        "commemoration_id": 1,
+        "canonical_name": "Мария",
+        "prefix": None,
+        "order_type": "здравие",
+        "period_type": "сорокоуст",
+        "ordered_at": "2026-01-01T12:00:00",
+        "starts_at": "2026-01-01",
+        "expires_at": "2026-02-10",
+        "is_active": True,
+        "order_id": 42,
+    }
+
+    get_current_user = _get_current_user_dep()
+    app.dependency_overrides[get_current_user] = override
+    try:
+        with patch("api.routes.names.get_by_user", new_callable=AsyncMock, return_value=[mock_commemoration]):
+            r = client.get(BY_USER, headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        data = r.json()
+        assert "commemorations" in data
+        assert len(data["commemorations"]) >= 1
+        assert "order_id" in data["commemorations"][0]
+        assert data["commemorations"][0]["order_id"] == 42
+    finally:
+        del app.dependency_overrides[get_current_user]
