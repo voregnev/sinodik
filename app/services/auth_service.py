@@ -23,8 +23,8 @@ from sqlalchemy.future import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import delete
 
-from app.models.models import User, OtpCode
-from app.config import settings
+from models.models import User, OtpCode
+from config import settings
 from .email_service import send_otp_email
 
 
@@ -46,7 +46,7 @@ async def check_rate_limit(email: str, db_session: AsyncSession, time_window_min
     Returns:
         True if within rate limit, False if exceeded
     """
-    time_threshold = datetime.utcnow() - timedelta(minutes=time_window_minutes)
+    time_threshold = datetime.now(datetime.UTC)- timedelta(minutes=time_window_minutes)
 
     # Count the number of OTP requests in the time window
     stmt = select(OtpCode).where(
@@ -92,7 +92,7 @@ async def request_otp(email: str, db_session: AsyncSession) -> Dict[str, Any]:
     otp_hash = hashlib.sha256(otp_code.encode()).hexdigest()
 
     # Set expiration time (10 minutes from now)
-    expires_at = datetime.utcnow() + timedelta(minutes=10)
+    expires_at = datetime.now(datetime.UTC)+ timedelta(minutes=10)
 
     # Create new OTP code record
     otp_record = OtpCode(
@@ -279,8 +279,8 @@ def create_jwt_token(email: str, role: str) -> str:
     payload = {
         "sub": email,  # Subject (user identifier)
         "role": role,  # User role
-        "exp": datetime.utcnow() + timedelta(days=settings.jwt_ttl_days),  # Expiration
-        "iat": datetime.utcnow()  # Issued at
+        "exp": datetime.now(datetime.UTC)+ timedelta(days=settings.jwt_ttl_days),  # Expiration
+        "iat": datetime.now(datetime.UTC) # Issued at
     }
 
     token = jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
