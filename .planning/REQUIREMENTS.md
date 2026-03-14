@@ -13,9 +13,9 @@
 - [ ] **AUTH-04**: User can verify the OTP code and receive a JWT session token
 - [ ] **AUTH-05**: Account is created automatically on first successful OTP verification (no separate registration step)
 - [ ] **AUTH-06**: OTP codes expire after 10 minutes
-- [ ] **AUTH-07**: OTP codes are single-use (invalidated immediately on successful verification)
-- [ ] **AUTH-08**: OTP requests are rate-limited per email to prevent brute-force
-- [ ] **AUTH-09**: JWT encodes user email, role, and expiry (stateless — no server-side session store)
+- [x] **AUTH-07**: OTP codes are single-use (invalidated immediately on successful verification)
+- [x] **AUTH-08**: OTP requests are rate-limited per email to prevent brute-force
+- [x] **AUTH-09**: JWT encodes user email, role, and expiry (stateless — no server-side session store)
 
 ### User Features
 
@@ -86,9 +86,9 @@
 | AUTH-04 | Phase 2 | Pending |
 | AUTH-05 | Phase 2 | Pending |
 | AUTH-06 | Phase 2 | Pending |
-| AUTH-07 | Phase 2 | Pending |
-| AUTH-08 | Phase 2 | Pending |
-| AUTH-09 | Phase 2 | Pending |
+| AUTH-07 | Phase 2 | Complete |
+| AUTH-08 | Phase 2 | Complete |
+| AUTH-09 | Phase 2 | Complete |
 | USER-01 | Phase 4 | Pending |
 | USER-02 | Phase 1 | Complete |
 | USER-03 | Phase 3 | Pending |
