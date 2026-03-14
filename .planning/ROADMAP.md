@@ -99,7 +99,7 @@ Plans:
 
 Plans:
 - [ ] 05-01-PLAN.md — Backend: add order_id to get_by_user and by-user response for Мои заказы grouping
-- [ ] 05-02-PLAN.md — Auth state, localStorage, fetch wrapper with Bearer and 401 handling
+- [x] 05-02-PLAN.md — Auth state, localStorage, fetch wrapper with Bearer and 401 handling
 - [ ] 05-03-PLAN.md — Login modal (email → OTP) and conditional tabs/header by role
 - [ ] 05-04-PLAN.md — Мои заказы screen and Податели section in БД tab
 
@@ -114,4 +114,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Auth Service Core | 0/3 | Not started | - |
 | 3. Auth Routes and Dependencies | 0/2 | Not started | - |
 | 4. Protected Routes and Admin Endpoints | 3/4 | In Progress|  |
-| 5. Frontend Auth Integration | 1/4 | In Progress|  |
+| 5. Frontend Auth Integration | 2/4 | In Progress|  |
