@@ -45,3 +45,28 @@ def test_anonymous_order_unaffected():
         ordered_at=datetime.utcnow()
     )
     assert o.user_email is None
+
+
+def test_user_model_columns():
+    from models.models import User
+    cols = {c.key: c for c in User.__table__.columns}
+    assert "id" in cols
+    assert "email" in cols
+    assert cols["email"].nullable is False
+    assert cols["email"].unique is True
+    assert "role" in cols
+    assert "is_active" in cols
+    assert "created_at" in cols
+    # No last_login_at (locked: keep schema minimal)
+    assert "last_login_at" not in cols
+
+
+def test_otp_code_model_columns():
+    from models.models import OtpCode
+    cols = {c.key: c for c in OtpCode.__table__.columns}
+    for field in ["id", "email", "code_hash", "created_at", "expires_at", "used", "attempt_count"]:
+        assert field in cols, f"Missing column: {field}"
+    # No FK to users (locked decision)
+    assert len(OtpCode.__table__.foreign_keys) == 0
+    assert cols["expires_at"].nullable is False
+    assert cols["code_hash"].nullable is True

@@ -211,3 +211,50 @@ class Commemoration(Base):
             f"{self.order_type} {self.period_type} "
             f"until {self.expires_at}>"
         )
+
+
+# ═══════════════════════════════════════════════════════════
+#  USER — учётная запись пользователя
+# ═══════════════════════════════════════════════════════════
+
+class User(Base):
+    """
+    Учётная запись пользователя.
+    Создаётся автоматически при первой успешной верификации OTP.
+    Роль admin назначается если email присутствует в settings.admin_emails.
+    """
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    role = Column(String(20), nullable=False, default="user")   # "user" | "admin"
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<User #{self.id} {self.email} role={self.role}>"
+
+
+# ═══════════════════════════════════════════════════════════
+#  OTP_CODE — одноразовый код подтверждения
+# ═══════════════════════════════════════════════════════════
+
+class OtpCode(Base):
+    """
+    Одноразовый код подтверждения (OTP).
+    email хранится без FK на users — код запрашивается до создания аккаунта.
+    code_hash: SHA-256 hex (заполняется в Phase 2).
+    attempt_count: счётчик неудачных попыток; при >= 5 код инвалидируется (Phase 2).
+    """
+    __tablename__ = "otp_codes"
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), nullable=False, index=True)
+    code_hash = Column(String(64), nullable=True)               # SHA-256 hex; Phase 2
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used = Column(Boolean, nullable=False, default=False)
+    attempt_count = Column(Integer, nullable=False, default=0)
+
+    def __repr__(self):
+        return f"<OtpCode #{self.id} email={self.email} used={self.used}>"
