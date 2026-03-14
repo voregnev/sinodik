@@ -333,11 +333,13 @@ async def get_commemorations(
     no_start_date: bool = False,
     limit: int = 100,
     offset: int = 0,
+    user_email: str | None = None,
 ) -> list[dict]:
     """
     Список поминовений для управления БД.
 
     Если no_start_date=True — только записи без даты начала (starts_at IS NULL).
+    Если user_email задан — только поминовения заказов этого пользователя; иначе все (для админа).
     """
     stmt = (
         select(
@@ -366,6 +368,8 @@ async def get_commemorations(
 
     if no_start_date:
         stmt = stmt.where(Commemoration.starts_at.is_(None))
+    if user_email is not None:
+        stmt = stmt.where(Order.user_email == user_email)
 
     result = await db.execute(stmt)
 

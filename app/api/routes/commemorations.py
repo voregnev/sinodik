@@ -5,8 +5,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.deps import get_current_user, require_admin
 from database import get_db
 from models import Commemoration
+from models.models import User
 from services.query_service import get_commemorations, bulk_set_starts_at
 from services.period_calculator import (
     calculate_expires_at,
@@ -36,9 +38,17 @@ async def list_commemorations(
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """List commemorations, optionally filtered to those without a start date."""
-    items = await get_commemorations(db, no_start_date=no_start_date, limit=limit, offset=offset)
+    """List commemorations; user sees own order commemorations, admin sees all."""
+    effective_email = None if current_user.role == "admin" else current_user.email
+    items = await get_commemorations(
+        db,
+        no_start_date=no_start_date,
+        limit=limit,
+        offset=offset,
+        user_email=effective_email,
+    )
     return {"items": items, "count": len(items)}
 
 
@@ -47,6 +57,7 @@ async def update_commemoration(
     commemoration_id: int,
     body: CommemorationUpdate,
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """Update one or more fields of a commemoration inline."""
     result = await db.execute(
@@ -92,6 +103,7 @@ async def update_commemoration(
 async def delete_commemoration(
     commemoration_id: int,
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """Удалить одну запись поминовения (одно имя)."""
     result = await db.execute(
@@ -109,6 +121,7 @@ async def delete_commemoration(
 async def bulk_update_starts_at(
     body: BulkUpdateRequest,
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """Bulk set starts_at (and recalculate expires_at) for a list of commemorations."""
     if not body.ids:
