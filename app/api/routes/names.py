@@ -10,7 +10,9 @@ import os
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.deps import get_current_user
 from database import get_db
+from models.models import User
 from services.query_service import get_active_today, search_names, get_stats, get_by_user
 
 router = APIRouter()
@@ -320,10 +322,15 @@ async def names_stats(db: AsyncSession = Depends(get_db)):
 
 @router.get("/names/by-user")
 async def names_by_user(
-    email: str = Query(..., description="Email заказчика"),
+    current_user: User = Depends(get_current_user),
+    email: str | None = Query(default=None, description="Email заказчика (только для admin)"),
     active_only: bool = Query(default=True),
     db: AsyncSession = Depends(get_db),
 ):
-    """Все поминовения конкретного пользователя (по email)."""
-    results = await get_by_user(db, user_email=email, active_only=active_only)
-    return {"user_email": email, "commemorations": results, "count": len(results)}
+    """Все поминовения пользователя. Обычный пользователь видит только свои; admin может передать ?email= для другого."""
+    if current_user.role == "admin" and email is not None:
+        effective_email = email
+    else:
+        effective_email = current_user.email
+    results = await get_by_user(db, user_email=effective_email, active_only=active_only)
+    return {"user_email": effective_email, "commemorations": results, "count": len(results)}
