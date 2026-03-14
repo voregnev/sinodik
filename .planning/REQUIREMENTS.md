@@ -19,13 +19,13 @@
 
 ### User Features
 
-- [ ] **USER-01**: Authenticated user can view their own orders (matched by email — includes historical CSV orders)
+- [x] **USER-01**: Authenticated user can view their own orders (matched by email — includes historical CSV orders)
 - [x] **USER-02**: Authenticated user's new orders are automatically linked to their account email
 - [x] **USER-03**: User can log out (client-side: discard JWT)
 
 ### Admin Features
 
-- [ ] **ADMN-01**: Admin can view all orders across all users
+- [x] **ADMN-01**: Admin can view all orders across all users
 - [ ] **ADMN-02**: Admin can view all user accounts (email, role, active status, created date)
 - [ ] **ADMN-03**: Admin can promote a user to admin role
 - [ ] **ADMN-04**: Admin can demote an admin to user role
@@ -89,10 +89,10 @@
 | AUTH-07 | Phase 2 | Complete |
 | AUTH-08 | Phase 2 | Complete |
 | AUTH-09 | Phase 2 | Complete |
-| USER-01 | Phase 4 | Pending |
+| USER-01 | Phase 4 | Complete |
 | USER-02 | Phase 1 | Complete |
 | USER-03 | Phase 3 | Complete |
-| ADMN-01 | Phase 4 | Pending |
+| ADMN-01 | Phase 4 | Complete |
 | ADMN-02 | Phase 4 | Pending |
 | ADMN-03 | Phase 4 | Pending |
 | ADMN-04 | Phase 4 | Pending |

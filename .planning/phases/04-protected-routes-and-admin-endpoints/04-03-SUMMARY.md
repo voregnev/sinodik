@@ -91,6 +91,11 @@ None - no external service configuration required.
 - Upload and commemorations routes are guarded per CONTEXT; get_commemorations supports user_email scope; tests cover 401, 403, and scope.
 - Ready for further phase 4 plans (e.g. admin users API if not already done).
 
+## Self-Check: PASSED
+
+- 04-03-SUMMARY.md present
+- Commits 4242386, 2ab7e10, 5677ece present
+
 ---
 *Phase: 04-protected-routes-and-admin-endpoints*
 *Completed: 2026-03-14*
