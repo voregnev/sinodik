@@ -77,7 +77,13 @@ Plans:
   3. Admin calling GET /api/v1/admin/users sees all accounts with email, role, active status, and created date
   4. Admin can promote, demote, and disable user accounts via PATCH /api/v1/admin/users/{id}; disabled user's JWT is rejected on next request
   5. Admin can edit and delete any commemoration record via PATCH/DELETE /api/v1/commemorations/{id}
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Test scaffolds and shared auth fixtures (Wave 0)
+- [ ] 04-02-PLAN.md — Optional auth dependency, names/by-user and orders guard and scope
+- [ ] 04-03-PLAN.md — Upload and commemorations guard and scope
+- [ ] 04-04-PLAN.md — Admin users API (GET/PATCH with last-admin protection)
 
 ### Phase 5: Frontend Auth Integration
 **Goal**: The React PWA presents a complete auth-aware UI — unauthenticated users see the login screen, authenticated users see their orders, and admins see the admin panel
