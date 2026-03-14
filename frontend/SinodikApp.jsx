@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 const API = "/api/v1";
 const AUTH_KEY = "sinodik_token";
+const authRef = { current: null };
 
 // ─── Theme ────────────────────────────────────────────────
 const T = {
@@ -47,10 +48,15 @@ const Icons = {
 // ─── Fetch helper (returns null on error) ─────────────────
 async function api(path, opts = {}) {
   try {
-    const res = await fetch(`${API}${path}`, {
-      headers: { "Content-Type": "application/json", ...opts.headers },
-      ...opts,
-    });
+    const headers = { "Content-Type": "application/json", ...opts.headers };
+    if (authRef.current?.token) headers.Authorization = `Bearer ${authRef.current.token}`;
+    const res = await fetch(`${API}${path}`, { ...opts, headers });
+    if (res.status === 401) {
+      localStorage.removeItem(AUTH_KEY);
+      authRef.current?.setToken?.(null);
+      authRef.current?.setUser?.(null);
+      return null;
+    }
     if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
     return await res.json();
   } catch (e) {
@@ -61,10 +67,17 @@ async function api(path, opts = {}) {
 
 // Like api() but throws on error (returns detail from body when available)
 async function apiOrThrow(path, opts = {}) {
-  const res = await fetch(`${API}${path}`, {
-    headers: { "Content-Type": "application/json", ...opts.headers },
-    ...opts,
-  });
+  const headers = { "Content-Type": "application/json", ...opts.headers };
+  if (authRef.current?.token) headers.Authorization = `Bearer ${authRef.current.token}`;
+  const res = await fetch(`${API}${path}`, { ...opts, headers });
+  if (res.status === 401) {
+    localStorage.removeItem(AUTH_KEY);
+    authRef.current?.setToken?.(null);
+    authRef.current?.setUser?.(null);
+    let detail = "401: Unauthorized";
+    try { const b = await res.json(); if (b.detail) detail = b.detail; } catch {}
+    throw new Error(detail);
+  }
   if (!res.ok) {
     let detail = `${res.status}: ${res.statusText}`;
     try { const b = await res.json(); if (b.detail) detail = b.detail; } catch {}
@@ -1662,6 +1675,7 @@ export default function SinodikApp() {
   const [tab, setTab] = useState("today");
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
+  authRef.current = { token, setToken, setUser };
 
   // Hydrate user from localStorage token on mount
   useEffect(() => {
