@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Literal
 
 from api.deps import require_admin
 from database import get_db
@@ -13,6 +14,11 @@ from models.models import User
 from models import Order, Commemoration
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+class UserPatchBody(BaseModel):
+    role: Literal["admin", "user"] | None = None
+    is_active: bool | None = None
 
 
 def _today_start_utc():
@@ -57,3 +63,44 @@ async def list_users(
         }
         for u, oc, acc in rows
     ]
+
+
+@router.patch("/users/{user_id}", status_code=200)
+async def patch_user(
+    user_id: int,
+    body: UserPatchBody,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update user role and/or is_active. Returns 400 when demoting or disabling the last admin."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if body.role is not None or body.is_active is not None:
+        if body.role == "user" or body.is_active is False:
+            count_result = await db.execute(
+                select(func.count(User.id)).where(
+                    User.role == "admin",
+                    User.is_active == True,
+                )
+            )
+            active_admin_count = count_result.scalar() or 0
+            if active_admin_count == 1 and user.id is not None and user.role == "admin" and user.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot demote or disable the last admin",
+                )
+    if body.role is not None:
+        user.role = body.role
+    if body.is_active is not None:
+        user.is_active = body.is_active
+    await db.commit()
+    await db.refresh(user)
+    return {
+        "id": user.id,
+        "email": user.email,
+        "role": user.role,
+        "is_active": user.is_active,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+    }
