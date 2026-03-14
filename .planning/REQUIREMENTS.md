@@ -40,10 +40,10 @@
 
 ### Frontend
 
-- [ ] **FRNT-01**: Login screen shown when user is not authenticated (email entry → OTP code entry)
+- [x] **FRNT-01**: Login screen shown when user is not authenticated (email entry → OTP code entry)
 - [x] **FRNT-02**: Authenticated user sees a "My Orders" tab showing their linked commemorations
 - [ ] **FRNT-03**: Admin sees an "Admin" tab with all orders and user management UI
-- [ ] **FRNT-04**: CSV upload tab is hidden for non-admin users
+- [x] **FRNT-04**: CSV upload tab is hidden for non-admin users
 - [x] **FRNT-05**: JWT stored client-side (localStorage); sent as `Authorization: Bearer` header on all authenticated requests
 - [x] **FRNT-06**: Anonymous users can still submit orders via the "Записка" tab (no login required)
 - [x] **FRNT-07**: App decodes JWT role claim client-side to conditionally render admin UI
@@ -101,10 +101,10 @@
 | ADMN-07 | Phase 4 | Complete |
 | ADMN-08 | Phase 4 | Complete |
 | BOOT-01 | Phase 1 | Complete |
-| FRNT-01 | Phase 5 | Pending |
+| FRNT-01 | Phase 5 | Complete |
 | FRNT-02 | Phase 5 | Complete |
 | FRNT-03 | Phase 5 | Pending |
-| FRNT-04 | Phase 5 | Pending |
+| FRNT-04 | Phase 5 | Complete |
 | FRNT-05 | Phase 5 | Complete |
 | FRNT-06 | Phase 5 | Complete |
 | FRNT-07 | Phase 5 | Complete |
