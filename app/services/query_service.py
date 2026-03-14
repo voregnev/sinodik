@@ -290,6 +290,7 @@ async def get_by_user(
             Commemoration.expires_at,
             Commemoration.is_active,
             Person.canonical_name,
+            Order.id.label("order_id"),
         )
         .join(Person, Person.id == Commemoration.person_id)
         .join(Order, Order.id == Commemoration.order_id)
@@ -319,6 +320,7 @@ async def get_by_user(
             "starts_at": r.starts_at.isoformat() if r.starts_at else None,
             "expires_at": r.expires_at.isoformat() if r.expires_at else None,
             "is_active": r.is_active,
+            "order_id": r.order_id,
         }
         for r in result.all()
     ]
