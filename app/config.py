@@ -5,6 +5,8 @@ All values can be overridden via environment variables
 with the SINODIK_ prefix (e.g. SINODIK_DATABASE_URL).
 """
 
+from typing import Union, List
+from pydantic import field_validator, Field
 from pydantic_settings import BaseSettings
 
 
@@ -22,6 +24,19 @@ class Settings(BaseSettings):
     embedding_api_key: str = ""
     embedding_dim: int = 384
     dedup_threshold: float = 0.85
+
+    # Auth
+    jwt_secret: str                        # required — no default → ValidationError if unset
+    jwt_ttl_days: int = 7                  # SINODIK_JWT_TTL_DAYS
+    admin_emails: Union[str, List[str]] = Field(default=[])  # SINODIK_ADMIN_EMAILS (comma-separated)
+    otp_plaintext_fallback: bool = False   # SINODIK_OTP_PLAINTEXT_FALLBACK
+
+    @field_validator("admin_emails", mode="before")
+    @classmethod
+    def parse_admin_emails(cls, v):
+        if isinstance(v, str):
+            return [e.strip().lower() for e in v.split(",") if e.strip()]
+        return [e.lower() for e in v] if v else []
 
     model_config = {"env_prefix": "SINODIK_"}
 
