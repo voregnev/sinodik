@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-03-14T20:55:17.254Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-03-14T20:55:55.443Z"
 last_activity: "2026-03-14 — Completed Plan 04-03: Upload and commemorations guard and scope"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 11
-  completed_plans: 9
+  completed_plans: 10
   percent: 73
 ---
 
@@ -55,6 +55,7 @@ Progress: [███████░░░] 73%
 | Phase 03 P02 | 15 | 3 tasks | 5 files |
 | Phase 04 P03 | 15 | 2 tasks | 5 files |
 | Phase 04-protected-routes-and-admin-endpoints P02 | 25 | 3 tasks | 5 files |
+| Phase 04-protected-routes-and-admin-endpoints P01 | 15 | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,7 @@ Recent decisions affecting current work:
 - AUTH-02/03/04: Implement OTP with SHA-256 hashing, constant-time comparison, rate limiting
 - [Phase 03]: Auth routes use Docker-safe imports (no app. prefix); tests mock verify_otp/rate_limit/me deps to avoid TestClient loop issues
 - [Phase 04]: Override route-module deps in tests (e.g. upload_routes.require_admin) so FastAPI dependency_overrides key matches
+- [Phase 04-protected-routes-and-admin-endpoints]: Conftest prefers main+api.deps import so dependency_overrides apply; real JWT fixtures for integration tests
 
 ### Pending Todos
 
@@ -83,6 +85,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T20:55:17.241Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-03-14T20:55:48.298Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None

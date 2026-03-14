@@ -107,5 +107,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Schema and Configuration | 2/2 | Complete   | 2026-03-14 |
 | 2. Auth Service Core | 0/3 | Not started | - |
 | 3. Auth Routes and Dependencies | 0/2 | Not started | - |
-| 4. Protected Routes and Admin Endpoints | 1/4 | In Progress|  |
+| 4. Protected Routes and Admin Endpoints | 3/4 | In Progress|  |
 | 5. Frontend Auth Integration | 0/TBD | Not started | - |
