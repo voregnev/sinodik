@@ -726,6 +726,96 @@ function AddPage() {
   );
 }
 
+// ─── My Orders (authenticated user) ───────────────────────
+
+function MyOrdersPage() {
+  const [orders, setOrders] = useState([]);
+  const [byUser, setByUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([
+      api("/orders"),
+      api("/names/by-user?active_only=false"),
+    ]).then(([ordersData, byUserData]) => {
+      if (cancelled) return;
+      setOrders(Array.isArray(ordersData) ? ordersData : []);
+      setByUser(byUserData);
+      setLoading(false);
+    }).catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading) return <Loading />;
+
+  const comms = byUser?.commemorations || [];
+  const byOrderId = {};
+  for (const c of comms) {
+    const oid = c.order_id;
+    if (!byOrderId[oid]) byOrderId[oid] = [];
+    byOrderId[oid].push(c);
+  }
+
+  const orderCards = orders.map(order => {
+    const group = byOrderId[order.id] || [];
+    const orderType = group[0]?.order_type || "здравие";
+    const periodType = group[0]?.period_type || "разовое";
+    let expiresAt = null;
+    for (const c of group) {
+      if (c.expires_at) {
+        const d = new Date(c.expires_at);
+        if (!expiresAt || d > expiresAt) expiresAt = d;
+      }
+    }
+    const names = group.map(c => c.canonical_name).filter(Boolean);
+    const isHealth = orderType === "здравие";
+    const color = isHealth ? T.green : T.red;
+
+    return (
+      <div
+        key={order.id}
+        style={{
+          background: T.card,
+          borderRadius: 10,
+          marginBottom: 10,
+          borderLeft: `4px solid ${color}`,
+          padding: "12px 14px",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+          <Badge color={color}>{isHealth ? "здравие" : "упокоение"}</Badge>
+          <span style={{ color: T.dim, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+            {PERIOD_LABELS[periodType] || periodType}
+          </span>
+        </div>
+        {expiresAt && (
+          <div style={{ color: T.dim, fontSize: 11, marginTop: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+            Окончание: {expiresAt.toLocaleDateString("ru-RU")}
+          </div>
+        )}
+        <div style={{ color: T.text, fontSize: 13, marginTop: 6, fontFamily: "'Cormorant Garamond', serif" }}>
+          {names.length > 0 ? names.slice(0, 5).join(", ") + (names.length > 5 ? ` и ещё ${names.length - 5}` : "") : `${group.length} имён`}
+        </div>
+      </div>
+    );
+  });
+
+  return (
+    <div style={{ padding: 16 }}>
+      <h2 style={{ margin: "0 0 12px", color: T.gold, fontSize: 20, fontFamily: "'Cormorant Garamond', serif" }}>
+        Записки
+      </h2>
+      {orderCards.length === 0 ? (
+        <div style={{ padding: 24 }} />
+      ) : (
+        <div>{orderCards}</div>
+      )}
+    </div>
+  );
+}
+
 function UploadPage() {
   const [file, setFile] = useState(null);
   const [startsAt, setStartsAt] = useState("");
@@ -1606,6 +1696,52 @@ function PersonManager() {
   );
 }
 
+function MyOrdersPage() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    api("/orders").then((data) => {
+      setOrders(Array.isArray(data) ? data : data?.items || []);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <Loading />;
+
+  return (
+    <div style={{ padding: 16 }}>
+      <h2 style={{ margin: "0 0 16px", color: T.gold, fontSize: 20, fontFamily: "'Cormorant Garamond', serif" }}>
+        Мои заказы
+      </h2>
+      {orders.length === 0 ? (
+        <Empty msg="" />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {orders.map((order) => (
+            <div
+              key={order.id}
+              style={{
+                padding: "12px 14px", background: T.card, borderRadius: 8,
+                borderLeft: `3px solid ${T.gold}`,
+              }}
+            >
+              <div style={{ color: T.text, fontSize: 14, fontFamily: "'Cormorant Garamond', serif" }}>
+                Записка #{order.id}
+              </div>
+              <div style={{ color: T.dim, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", marginTop: 4 }}>
+                {order.ordered_at ? order.ordered_at.slice(0, 10) : order.created_at?.slice(0, 10) || "—"}
+                {order.source_channel ? ` · ${order.source_channel}` : ""}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DbManagePage() {
   const [section, setSection] = useState("commemorations");
 
@@ -1662,13 +1798,18 @@ function Empty({ msg }) {
 
 // ─── App Shell ────────────────────────────────────────────
 
-const TABS = [
+const TABS_FULL = [
   { id: "today", label: "Сегодня", icon: Icons.calendar },
   { id: "search", label: "Поиск", icon: Icons.search },
   { id: "add", label: "Записка", icon: Icons.plus },
   { id: "upload", label: "CSV", icon: Icons.upload },
   { id: "stats", label: "Стат.", icon: Icons.bar },
   { id: "db", label: "БД", icon: Icons.db },
+];
+
+const TABS_USER = [
+  { id: "add", label: "Записка", icon: Icons.plus },
+  { id: "myOrders", label: "Мои заказы", icon: Icons.list },
 ];
 
 export default function SinodikApp() {
@@ -1761,6 +1902,21 @@ export default function SinodikApp() {
       setLoginSubmitting(false);
     }
   };
+
+  const logout = () => {
+    localStorage.removeItem(AUTH_KEY);
+    setToken(null);
+    setUser(null);
+  };
+
+  const visibleTabs = !user ? null : user.role === "admin" ? TABS_FULL : TABS_USER;
+
+  // When non-admin, ensure tab is add or myOrders
+  useEffect(() => {
+    if (user && user.role !== "admin" && visibleTabs && !visibleTabs.some((t) => t.id === tab)) {
+      setTab("add");
+    }
+  }, [user, tab, visibleTabs]);
 
   // Hydrate user from localStorage token on mount
   useEffect(() => {
@@ -1902,7 +2058,7 @@ export default function SinodikApp() {
             </div>
           </div>
         </div>
-        {!user && (
+        {!user ? (
           <button
             onClick={openLogin}
             style={{
@@ -1913,31 +2069,69 @@ export default function SinodikApp() {
           >
             Войти
           </button>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {user.role !== "admin" && (
+              <button
+                onClick={() => setTab("myOrders")}
+                style={{
+                  padding: "8px 12px", borderRadius: 8, border: "none",
+                  background: "transparent", color: T.gold, cursor: "pointer",
+                  fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
+                }}
+              >
+                Мои заказы
+              </button>
+            )}
+            <button
+              onClick={logout}
+              style={{
+                padding: "8px 14px", borderRadius: 8, border: `1px solid ${T.border}`,
+                background: "transparent", color: T.dim, cursor: "pointer",
+                fontSize: 12, fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
+              Выйти
+            </button>
+          </div>
         )}
       </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, overflowY: "auto", paddingBottom: 70 }}>
-        {tab === "today" && <TodayPage />}
-        {tab === "search" && <SearchPage />}
-        {tab === "add" && <AddPage />}
-        {tab === "upload" && <UploadPage />}
-        {tab === "stats" && <StatsPage />}
-        {tab === "db" && <DbManagePage />}
+      {/* Content: guest = form only; user = tabs; admin = full tabs */}
+      <div style={{ flex: 1, overflowY: "auto", paddingBottom: visibleTabs ? 70 : 16 }}>
+        {!user ? (
+          <AddPage />
+        ) : user.role === "admin" ? (
+          <>
+            {tab === "today" && <TodayPage />}
+            {tab === "search" && <SearchPage />}
+            {tab === "add" && <AddPage />}
+            {tab === "upload" && <UploadPage />}
+            {tab === "stats" && <StatsPage />}
+            {tab === "db" && <DbManagePage />}
+          </>
+        ) : (
+          <>
+            {tab === "add" && <AddPage />}
+            {tab === "myOrders" && <MyOrdersPage />}
+          </>
+        )}
       </div>
 
-      {/* Bottom Tab Bar */}
-      <div style={{
-        position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
-        width: "100%", maxWidth: 480,
-        display: "flex", background: T.surface,
-        borderTop: `1px solid ${T.border}`,
-        paddingBottom: "env(safe-area-inset-bottom, 8px)",
-      }}>
-        {TABS.map(t => (
-          <Tab key={t.id} active={tab === t.id} label={t.label} icon={t.icon} onClick={() => setTab(t.id)} />
-        ))}
-      </div>
+      {/* Bottom Tab Bar: only when authenticated */}
+      {visibleTabs && (
+        <div style={{
+          position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
+          width: "100%", maxWidth: 480,
+          display: "flex", background: T.surface,
+          borderTop: `1px solid ${T.border}`,
+          paddingBottom: "env(safe-area-inset-bottom, 8px)",
+        }}>
+          {visibleTabs.map((t) => (
+            <Tab key={t.id} active={tab === t.id} label={t.label} icon={t.icon} onClick={() => setTab(t.id)} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
