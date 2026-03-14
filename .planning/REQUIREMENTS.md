@@ -41,7 +41,7 @@
 ### Frontend
 
 - [ ] **FRNT-01**: Login screen shown when user is not authenticated (email entry → OTP code entry)
-- [ ] **FRNT-02**: Authenticated user sees a "My Orders" tab showing their linked commemorations
+- [x] **FRNT-02**: Authenticated user sees a "My Orders" tab showing their linked commemorations
 - [ ] **FRNT-03**: Admin sees an "Admin" tab with all orders and user management UI
 - [ ] **FRNT-04**: CSV upload tab is hidden for non-admin users
 - [ ] **FRNT-05**: JWT stored client-side (localStorage); sent as `Authorization: Bearer` header on all authenticated requests
@@ -102,7 +102,7 @@
 | ADMN-08 | Phase 4 | Complete |
 | BOOT-01 | Phase 1 | Complete |
 | FRNT-01 | Phase 5 | Pending |
-| FRNT-02 | Phase 5 | Pending |
+| FRNT-02 | Phase 5 | Complete |
 | FRNT-03 | Phase 5 | Pending |
 | FRNT-04 | Phase 5 | Pending |
 | FRNT-05 | Phase 5 | Pending |
