@@ -9,8 +9,7 @@ This milestone adds OTP-based authentication, JWT sessions, and two-role RBAC to
 **Phase Numbering:**
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-Decimal phases appear between their surrounding integers in numeric order.
+- Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Schema and Configuration** - Add users and otp_codes tables, ORM models, and auth config settings (completed 2026-03-14)
 - [ ] **Phase 2: Auth Service Core** - OTP generation, verification, JWT issuance, and email delivery
@@ -46,7 +45,12 @@ Plans:
   3. An OTP expires after 10 minutes and is rejected after expiry
   4. After 5 failed OTP attempts the code is invalidated and further attempts are rejected
   5. A user account is auto-created on first successful OTP verification; subsequent verifications update last_login_at
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Basic auth service with OTP generation and JWT issuance
+- [ ] 02-02-PLAN.md — Email service with SMTP delivery and fallback mechanism
+- [ ] 02-03-PLAN.md — Auth-email integration and OTP lifecycle management
 
 ### Phase 3: Auth Routes and Dependencies
 **Goal**: The auth API is reachable over HTTP — OTP request and verify endpoints are live, JWT verification and role-checking dependencies exist and are importable by any route
@@ -91,7 +95,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Schema and Configuration | 2/2 | Complete   | 2026-03-14 |
-| 2. Auth Service Core | 0/TBD | Not started | - |
+| 2. Auth Service Core | 0/3 | Not started | - |
 | 3. Auth Routes and Dependencies | 0/TBD | Not started | - |
 | 4. Protected Routes and Admin Endpoints | 0/TBD | Not started | - |
 | 5. Frontend Auth Integration | 0/TBD | Not started | - |
