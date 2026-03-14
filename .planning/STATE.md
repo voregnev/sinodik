@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-03-14T14:21:17.041Z"
+last_updated: "2026-03-14T14:25:59.354Z"
 last_activity: "2026-03-14 — Completed Plan 01-01: Auth configuration fields"
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 50
 ---
 
@@ -50,6 +50,7 @@ Progress: [█████░░░░░] 50%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01-schema-and-configuration P02 | 120 | 2 tasks | 3 files |
 
 ## Accumulated Context
 

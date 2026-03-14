@@ -12,7 +12,7 @@ This milestone adds OTP-based authentication, JWT sessions, and two-role RBAC to
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Schema and Configuration** - Add users and otp_codes tables, ORM models, and auth config settings
+- [x] **Phase 1: Schema and Configuration** - Add users and otp_codes tables, ORM models, and auth config settings (completed 2026-03-14)
 - [ ] **Phase 2: Auth Service Core** - OTP generation, verification, JWT issuance, and email delivery
 - [ ] **Phase 3: Auth Routes and Dependencies** - HTTP endpoints, FastAPI dependency injection, and logout flow
 - [ ] **Phase 4: Protected Routes and Admin Endpoints** - Guard existing routes, add user-scoped and admin endpoints
@@ -90,7 +90,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Schema and Configuration | 0/2 | Not started | - |
+| 1. Schema and Configuration | 2/2 | Complete   | 2026-03-14 |
 | 2. Auth Service Core | 0/TBD | Not started | - |
 | 3. Auth Routes and Dependencies | 0/TBD | Not started | - |
 | 4. Protected Routes and Admin Endpoints | 0/TBD | Not started | - |
