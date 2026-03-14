@@ -6,8 +6,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.deps import get_current_user, get_current_user_optional, require_admin
 from database import get_db
 from models import Order, Commemoration, Person
+from models.models import User
 from services.order_service import create_manual_order, refill_order_commemorations
 
 router = APIRouter()
@@ -30,14 +32,19 @@ class OrderUpdate(BaseModel):
 
 
 @router.post("/orders")
-async def create_order(body: OrderCreate, db: AsyncSession = Depends(get_db)):
+async def create_order(
+    body: OrderCreate,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+):
+    link_email = current_user.email if current_user is not None else body.user_email
     try:
         comms = await create_manual_order(
             db,
             order_type=body.order_type,
             period_type_raw=body.period_type,
             names_text=body.names_text,
-            user_email=body.user_email,
+            user_email=link_email,
             starts_at=body.starts_at,
             need_receipt=body.need_receipt,
         )
@@ -55,13 +62,15 @@ async def create_order(body: OrderCreate, db: AsyncSession = Depends(get_db)):
 
 @router.get("/orders")
 async def list_orders(
+    current_user: User = Depends(get_current_user),
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(Order).order_by(Order.created_at.desc()).offset(offset).limit(limit)
-    )
+    stmt = select(Order).order_by(Order.created_at.desc()).offset(offset).limit(limit)
+    if current_user.role != "admin":
+        stmt = stmt.where(Order.user_email == current_user.email)
+    result = await db.execute(stmt)
     orders = result.scalars().all()
     return [
         {
@@ -80,9 +89,10 @@ async def list_orders(
 @router.get("/orders/{order_id}")
 async def get_order(
     order_id: int,
+    _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get one order with source_raw and list of extracted commemorations (names with prefix/suffix)."""
+    """Get one order with source_raw and list of extracted commemorations (names with prefix/suffix). Admin only."""
     order_result = await db.execute(select(Order).where(Order.id == order_id))
     order = order_result.scalar_one_or_none()
     if not order:
@@ -127,6 +137,7 @@ async def get_order(
 async def update_order(
     order_id: int,
     body: OrderUpdate,
+    _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Order).where(Order.id == order_id))
@@ -159,7 +170,11 @@ async def update_order(
 
 
 @router.delete("/orders/{order_id}")
-async def delete_order(order_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_order(
+    order_id: int,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(Order).where(Order.id == order_id))
     order = result.scalar_one_or_none()
     if not order:
