@@ -55,6 +55,31 @@ async def get_current_user(
     return user
 
 
+async def get_current_user_optional(
+    credentials: HTTPAuthorizationCredentials | None = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """Validate Bearer JWT if present; load user by email (payload['sub']). Return None if missing/invalid/inactive."""
+    if credentials is None:
+        return None
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            settings.jwt_secret,
+            algorithms=["HS256"],
+        )
+    except jwt.InvalidTokenError:
+        return None
+    email = payload.get("sub")
+    if not email:
+        return None
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
+        return None
+    return user
+
+
 async def require_admin(user: User = Depends(get_current_user)) -> User:
     """Require admin role; return 403 if role != 'admin'."""
     if user.role != "admin":
