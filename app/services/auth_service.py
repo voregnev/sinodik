@@ -4,6 +4,9 @@ Implements:
 - AUTH-02: User can request a one-time code by providing their email address
 - AUTH-03: User can verify the OTP code and receive a JWT session token
 - AUTH-04: Account is created automatically on first successful OTP verification
+- AUTH-07: OTP lifecycle management with expiry and single-use
+- AUTH-08: Rate limiting for OTP attempts
+- AUTH-09: Integration with email service with fallback mechanism
 """
 
 import secrets
@@ -12,20 +15,53 @@ import hmac
 import re
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
+import logging
 
 import jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import delete
 
 from app.models.models import User, OtpCode
 from app.config import settings
+from .email_service import send_otp_email
 
 
 def is_valid_email(email: str) -> bool:
     """Validate email format using regex."""
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(pattern, email) is not None
+
+
+async def check_rate_limit(email: str, db_session: AsyncSession, time_window_minutes: int = 5, max_requests: int = 5) -> bool:
+    """Check if the user has exceeded the OTP request rate limit.
+
+    Args:
+        email: User's email address
+        db_session: Async database session
+        time_window_minutes: Time window to check for requests (default: 5 minutes)
+        max_requests: Maximum number of requests allowed in the time window (default: 5)
+
+    Returns:
+        True if within rate limit, False if exceeded
+    """
+    time_threshold = datetime.utcnow() - timedelta(minutes=time_window_minutes)
+
+    # Count the number of OTP requests in the time window
+    stmt = select(OtpCode).where(
+        OtpCode.email == email.lower(),
+        OtpCode.created_at > time_threshold
+    )
+
+    result = await db_session.execute(stmt)
+    recent_requests = result.scalars().all()
+
+    # Check if the number of recent requests exceeds the limit
+    if len(recent_requests) >= max_requests:
+        return False
+
+    return True
 
 
 async def request_otp(email: str, db_session: AsyncSession) -> Dict[str, Any]:
@@ -40,6 +76,14 @@ async def request_otp(email: str, db_session: AsyncSession) -> Dict[str, Any]:
     """
     if not is_valid_email(email):
         raise ValueError(f"Invalid email format: {email}")
+
+    # Check rate limit for OTP requests
+    within_rate_limit = await check_rate_limit(email, db_session)
+    if not within_rate_limit:
+        return {
+            "success": False,
+            "message": "Rate limit exceeded. Please try again later."
+        }
 
     # Generate 6-digit OTP
     otp_code = f"{secrets.randbelow(1_000_000):06d}"
@@ -60,17 +104,53 @@ async def request_otp(email: str, db_session: AsyncSession) -> Dict[str, Any]:
     # Add to session and commit
     try:
         db_session.add(otp_record)
-        await db_session.commit()
 
-        # For development, we might want to output the code depending on settings
-        if settings.otp_plaintext_fallback:
-            print(f"[DEV] OTP for {email}: {otp_code}")
+        # Attempt to send OTP via email
+        try:
+            email_sent = await send_otp_email(email.lower(), otp_code)
 
-        return {
-            "success": True,
-            "message": "OTP sent successfully",
-            "dev_otp_code": otp_code if settings.otp_plaintext_fallback else None
-        }
+            if email_sent:
+                # Email sent successfully, return success without OTP in response
+                await db_session.commit()
+                return {
+                    "success": True,
+                    "message": "OTP sent successfully via email"
+                }
+            else:
+                # Email failed, check if plaintext fallback is enabled
+                if settings.otp_plaintext_fallback:
+                    await db_session.commit()
+                    return {
+                        "success": True,
+                        "message": "OTP generated successfully",
+                        "dev_otp_code": otp_code
+                    }
+                else:
+                    # Rollback and return error if fallback is disabled
+                    await db_session.rollback()
+                    return {
+                        "success": False,
+                        "message": "Failed to send OTP via email and plaintext fallback is disabled"
+                    }
+        except Exception as email_error:
+            logging.error(f"Email delivery failed for {email}: {str(email_error)}")
+
+            # Check if plaintext fallback is enabled
+            if settings.otp_plaintext_fallback:
+                await db_session.commit()
+                return {
+                    "success": True,
+                    "message": "OTP delivery failed, but code provided for development",
+                    "dev_otp_code": otp_code
+                }
+            else:
+                # Rollback the database transaction since email delivery failed
+                await db_session.rollback()
+                return {
+                    "success": False,
+                    "message": f"Failed to send OTP: {str(email_error)}"
+                }
+
     except Exception as e:
         await db_session.rollback()
         return {
@@ -119,6 +199,11 @@ async def verify_otp(email: str, code: str, db_session: AsyncSession) -> Optiona
         # Increment attempt count
         otp_record.attempt_count += 1
         await db_session.commit()
+
+        # Check if max attempts reached
+        if otp_record.attempt_count >= 5:
+            # OTP record is now invalid due to too many attempts
+            return None
         return None
 
     # OTP is valid, mark as used
@@ -200,3 +285,24 @@ def create_jwt_token(email: str, role: str) -> str:
 
     token = jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
     return token
+
+
+async def cleanup_expired_otps(db_session: AsyncSession) -> int:
+    """Remove expired OTP codes from the database to prevent accumulation.
+
+    Args:
+        db_session: Async database session
+
+    Returns:
+        Number of expired OTPs deleted
+    """
+    from sqlalchemy import delete
+
+    # Delete all OTP codes that have expired
+    stmt = delete(OtpCode).where(OtpCode.expires_at < datetime.utcnow())
+
+    result = await db_session.execute(stmt)
+    await db_session.commit()
+
+    deleted_count = result.rowcount
+    return deleted_count

@@ -3,6 +3,7 @@ Email service for sending OTP codes via SMTP.
 """
 import asyncio
 import ssl
+import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
@@ -83,28 +84,29 @@ Sinodic Team
 
                 await smtp_client.send_message(msg)
 
+            logging.info(f"OTP email successfully sent to {recipient_email}")
             return True
 
         except aiosmtplib.SMTPException as e:
             # Log the error for debugging
-            print(f"SMTP error occurred while sending email to {recipient_email}: {str(e)}")
+            logging.error(f"SMTP error occurred while sending email to {recipient_email}: {str(e)}")
 
             # Check if plaintext fallback is enabled
             if getattr(settings, 'otp_plaintext_fallback', False):
                 # Fallback to plaintext mechanism - this could be logging to console,
                 # saving to a file, or any other plaintext mechanism configured
-                print(f"[PLAINTEXT FALLBACK] OTP for {recipient_email}: {otp_code}")
+                logging.warning(f"[PLAINTEXT FALLBACK] OTP for {recipient_email}: {otp_code}")
                 return True
             else:
                 # Re-raise the exception if no fallback is configured
                 raise Exception(f"Failed to send OTP email: {str(e)}")
 
         except Exception as e:
-            print(f"Unexpected error occurred while sending email to {recipient_email}: {str(e)}")
+            logging.error(f"Unexpected error occurred while sending email to {recipient_email}: {str(e)}")
 
             # Check if plaintext fallback is enabled
             if getattr(settings, 'otp_plaintext_fallback', False):
-                print(f"[PLAINTEXT FALLBACK] OTP for {recipient_email}: {otp_code}")
+                logging.warning(f"[PLAINTEXT FALLBACK] OTP for {recipient_email}: {otp_code}")
                 return True
             else:
                 raise

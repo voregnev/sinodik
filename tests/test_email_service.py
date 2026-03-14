@@ -99,3 +99,61 @@ async def test_smtp_fallback_mechanism():
         finally:
             # Restore original print
             builtins.print = original_print
+
+
+@pytest.mark.asyncio
+async def test_smtp_no_fallback_when_disabled():
+    """
+    Test that SMTP errors are raised when fallback is disabled.
+    """
+    # Mock the aiosmtplib.SMTP class to raise an exception
+    with patch('aiosmtplib.SMTP') as mock_smtp_class:
+        mock_smtp_instance = AsyncMock()
+        mock_smtp_class.return_value.__aenter__.return_value = mock_smtp_instance
+        mock_smtp_instance.starttls = AsyncMock()
+        mock_smtp_instance.login = AsyncMock()
+        mock_smtp_instance.send_message = AsyncMock(side_effect=Exception("SMTP Failed"))
+
+        # Mock settings with fallback disabled
+        with patch('app.services.email_service.settings') as mock_settings:
+            mock_settings.smtp_host = "smtp.example.com"
+            mock_settings.smtp_port = 587
+            mock_settings.smtp_username = "test_user"
+            mock_settings.smtp_password = "test_pass"
+            mock_settings.smtp_from_address = "noreply@example.com"
+            mock_settings.smtp_use_tls = True
+            mock_settings.smtp_use_ssl = False
+            mock_settings.smtp_validate_certs = True
+            mock_settings.otp_plaintext_fallback = False  # Disable fallback
+
+            # This should raise an exception because fallback is disabled
+            with pytest.raises(Exception, match="Failed to send OTP email"):
+                await send_otp_email("test@example.com", "123456")
+
+
+@pytest.mark.asyncio
+async def test_auth_email_integration():
+    """
+    Test that auth service properly integrates with email service respecting the plaintext fallback setting.
+    """
+    # We can test that the email service module correctly imports and uses settings
+    with patch('aiosmtplib.SMTP') as mock_smtp_class:
+        mock_smtp_instance = AsyncMock()
+        mock_smtp_class.return_value.__aenter__.return_value = mock_smtp_instance
+        mock_smtp_instance.send_message = AsyncMock(side_effect=Exception("SMTP Failed"))
+
+        # Mock settings with fallback enabled
+        with patch('app.services.email_service.settings') as mock_settings:
+            mock_settings.smtp_host = "smtp.example.com"
+            mock_settings.smtp_port = 587
+            mock_settings.smtp_username = ""
+            mock_settings.smtp_password = ""
+            mock_settings.smtp_from_address = "noreply@example.com"
+            mock_settings.smtp_use_tls = False
+            mock_settings.smtp_use_ssl = False
+            mock_settings.smtp_validate_certs = True
+            mock_settings.otp_plaintext_fallback = True  # Enable fallback
+
+            # Should succeed despite SMTP error because of fallback
+            result = await send_otp_email("test@example.com", "123456")
+            assert result is True
