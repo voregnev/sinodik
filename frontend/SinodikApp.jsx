@@ -1255,7 +1255,7 @@ function CommemorationManager() {
   );
 }
 
-function OrderManager() {
+function OrderManager({ filterByUserEmail }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -1271,6 +1271,10 @@ function OrderManager() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const displayedOrders = filterByUserEmail
+    ? orders.filter(o => (o.user_email || "") === filterByUserEmail)
+    : orders;
 
   const startEdit = async (order) => {
     setEditingId(order.id);
@@ -1328,8 +1332,8 @@ function OrderManager() {
     <div>
       {loading ? <Loading /> : (
         <div style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>
-          {orders.length === 0 && <Empty msg="Нет записей" />}
-          {orders.map(order => (
+          {displayedOrders.length === 0 && <Empty msg="Нет записей" />}
+          {displayedOrders.map(order => (
             <div key={order.id} style={{
               background: T.card, borderRadius: 8, marginBottom: 6,
               borderLeft: `3px solid ${T.gold}`, padding: "8px 12px",
@@ -1742,8 +1746,70 @@ function MyOrdersPage() {
   );
 }
 
-function DbManagePage() {
+function SubmittersSection({ onSelectOrders }) {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api("/admin/users").then(data => {
+      setUsers(Array.isArray(data) ? data : []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return <Loading />;
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <h3 style={{ color: T.gold, fontSize: 16, fontFamily: "'Cormorant Garamond', serif", marginBottom: 10 }}>
+        Податели
+      </h3>
+      {users.length === 0 ? (
+        <div style={{ color: T.dim, fontSize: 12 }}>Нет пользователей</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {users.map(u => (
+            <div
+              key={u.id}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "10px 12px", background: T.card, borderRadius: 8,
+                borderLeft: `3px solid ${T.purple}`,
+              }}
+            >
+              <div>
+                <span style={{ color: T.text, fontSize: 14 }}>{u.email}</span>
+                <div style={{ color: T.dim, fontSize: 11, marginTop: 2 }}>
+                  Записок: {u.orders_count ?? 0} · Активных: {u.active_commemoration_count ?? 0}
+                </div>
+              </div>
+              <button
+                onClick={() => onSelectOrders(u.email)}
+                style={{
+                  padding: "6px 12px", borderRadius: 6, border: "none", cursor: "pointer",
+                  background: T.gold + "33", color: T.gold, fontSize: 11, fontWeight: 600,
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}
+              >
+                Заказы
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DbManagePage({ user }) {
   const [section, setSection] = useState("commemorations");
+  const [filterByUserEmail, setFilterByUserEmail] = useState(null);
+
+  const isAdmin = user?.role === "admin";
+  const handleSelectOrders = (email) => {
+    setFilterByUserEmail(email);
+    setSection("orders");
+  };
 
   return (
     <div style={{ padding: 16 }}>
@@ -1751,13 +1817,20 @@ function DbManagePage() {
         База данных
       </h2>
 
+      {isAdmin && (
+        <>
+          <SubmittersSection onSelectOrders={handleSelectOrders} />
+          <div style={{ borderTop: `1px solid ${T.border}`, marginBottom: 16 }} />
+        </>
+      )}
+
       <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
         {[
           { id: "commemorations", label: "Поминовения" },
           { id: "orders", label: "Записки" },
           { id: "persons", label: "Словарь имён" },
         ].map(s => (
-          <button key={s.id} onClick={() => setSection(s.id)} style={{
+          <button key={s.id} onClick={() => { setSection(s.id); if (s.id !== "orders") setFilterByUserEmail(null); }} style={{
             flex: 1, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer",
             fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
             background: section === s.id ? T.gold + "33" : T.card,
@@ -1766,8 +1839,20 @@ function DbManagePage() {
         ))}
       </div>
 
+      {filterByUserEmail && section === "orders" && (
+        <div style={{ marginBottom: 10, color: T.dim, fontSize: 12 }}>
+          Записки подателя: {filterByUserEmail}
+          <button
+            onClick={() => setFilterByUserEmail(null)}
+            style={{ marginLeft: 8, padding: "2px 8px", borderRadius: 4, border: "none", background: T.border, color: T.text, cursor: "pointer", fontSize: 11 }}
+          >
+            Сбросить
+          </button>
+        </div>
+      )}
+
       {section === "commemorations" && <CommemorationManager />}
-      {section === "orders" && <OrderManager />}
+      {section === "orders" && <OrderManager filterByUserEmail={filterByUserEmail} />}
       {section === "persons" && <PersonManager />}
     </div>
   );
@@ -2108,7 +2193,7 @@ export default function SinodikApp() {
             {tab === "add" && <AddPage />}
             {tab === "upload" && <UploadPage />}
             {tab === "stats" && <StatsPage />}
-            {tab === "db" && <DbManagePage />}
+            {tab === "db" && <DbManagePage user={user} />}
           </>
         ) : (
           <>
