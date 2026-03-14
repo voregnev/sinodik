@@ -1,0 +1,64 @@
+# Project State
+
+## Project Reference
+
+See: .planning/PROJECT.md (updated 2026-03-14)
+
+**Core value:** A submitter who logs in with their email sees exactly their commemorations — past and present — without accessing anyone else's data.
+**Current focus:** Phase 1 — Schema and Configuration
+
+## Current Position
+
+Phase: 1 of 5 (Schema and Configuration)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-03-14 — Roadmap created, ready to plan Phase 1
+
+Progress: [░░░░░░░░░░] 0%
+
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 0
+- Average duration: -
+- Total execution time: 0 hours
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
+
+**Recent Trend:**
+- Last 5 plans: -
+- Trend: -
+
+*Updated after each plan completion*
+
+## Accumulated Context
+
+### Decisions
+
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
+
+- Roadmap: OTP-only auth (no passwords) — simpler, no password hashing or reset flow
+- Roadmap: Auto-create account on first OTP — removes admin friction for onboarding
+- Roadmap: JWT stateless sessions — no Redis dependency, fits existing stack
+- Roadmap: OTP dev fallback gated on explicit SINODIK_OTP_PLAINTEXT_FALLBACK boolean (default False)
+- Roadmap: Standardize on SINODIK_ADMIN_EMAIL (singular) for first-admin bootstrap
+
+### Pending Todos
+
+None yet.
+
+### Blockers/Concerns
+
+- Phase 2 implementation: confirm aiosmtplib 3.x async context manager API when writing email_service.py (research noted WebFetch was denied; medium confidence)
+- Phase 1 config: decide JWT TTL before writing any JWT code (research recommends 60 min default, not 7 days)
+
+## Session Continuity
+
+Last session: 2026-03-14
+Stopped at: Roadmap created — all 5 phases defined, 28 requirements mapped, ready to plan Phase 1
+Resume file: None

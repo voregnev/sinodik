@@ -89,31 +89,31 @@
 | AUTH-07 | Phase 2 | Pending |
 | AUTH-08 | Phase 2 | Pending |
 | AUTH-09 | Phase 2 | Pending |
-| USER-01 | Phase 3 | Pending |
+| USER-01 | Phase 4 | Pending |
 | USER-02 | Phase 1 | Pending |
-| USER-03 | Phase 4 | Pending |
-| ADMN-01 | Phase 3 | Pending |
-| ADMN-02 | Phase 3 | Pending |
-| ADMN-03 | Phase 3 | Pending |
-| ADMN-04 | Phase 3 | Pending |
-| ADMN-05 | Phase 3 | Pending |
-| ADMN-06 | Phase 3 | Pending |
-| ADMN-07 | Phase 3 | Pending |
-| ADMN-08 | Phase 3 | Pending |
+| USER-03 | Phase 3 | Pending |
+| ADMN-01 | Phase 4 | Pending |
+| ADMN-02 | Phase 4 | Pending |
+| ADMN-03 | Phase 4 | Pending |
+| ADMN-04 | Phase 4 | Pending |
+| ADMN-05 | Phase 4 | Pending |
+| ADMN-06 | Phase 4 | Pending |
+| ADMN-07 | Phase 4 | Pending |
+| ADMN-08 | Phase 4 | Pending |
 | BOOT-01 | Phase 1 | Pending |
-| FRNT-01 | Phase 4 | Pending |
-| FRNT-02 | Phase 4 | Pending |
-| FRNT-03 | Phase 4 | Pending |
-| FRNT-04 | Phase 4 | Pending |
-| FRNT-05 | Phase 4 | Pending |
-| FRNT-06 | Phase 4 | Pending |
-| FRNT-07 | Phase 4 | Pending |
+| FRNT-01 | Phase 5 | Pending |
+| FRNT-02 | Phase 5 | Pending |
+| FRNT-03 | Phase 5 | Pending |
+| FRNT-04 | Phase 5 | Pending |
+| FRNT-05 | Phase 5 | Pending |
+| FRNT-06 | Phase 5 | Pending |
+| FRNT-07 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 24 total
-- Mapped to phases: 24
+- v1 requirements: 28 total
+- Mapped to phases: 28
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-14*
-*Last updated: 2026-03-14 after initial definition*
+*Last updated: 2026-03-14 after roadmap creation (5-phase structure, corrected count from 24 to 28)*
