@@ -21,7 +21,7 @@
 
 - [ ] **USER-01**: Authenticated user can view their own orders (matched by email — includes historical CSV orders)
 - [x] **USER-02**: Authenticated user's new orders are automatically linked to their account email
-- [ ] **USER-03**: User can log out (client-side: discard JWT)
+- [x] **USER-03**: User can log out (client-side: discard JWT)
 
 ### Admin Features
 
@@ -91,7 +91,7 @@
 | AUTH-09 | Phase 2 | Complete |
 | USER-01 | Phase 4 | Pending |
 | USER-02 | Phase 1 | Complete |
-| USER-03 | Phase 3 | Pending |
+| USER-03 | Phase 3 | Complete |
 | ADMN-01 | Phase 4 | Pending |
 | ADMN-02 | Phase 4 | Pending |
 | ADMN-03 | Phase 4 | Pending |

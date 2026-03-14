@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in_progress
-stopped_at: Completed 03-01-PLAN.md (JWT and role deps)
-last_updated: "2026-03-14T20:30:00.000Z"
+status: completed
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-03-14T20:28:32.420Z"
 last_activity: "2026-03-14 — Completed Plan 03-01: JWT and role dependencies"
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 7
   completed_plans: 7
-  percent: 86
+  percent: 100
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 ## Current Position
 
 Phase: 3 of 5 (Auth Routes and Dependencies)
-Plan: 1 of 2 in current phase (03-01 completed)
-Status: Plan 03-01 completed
-Last activity: 2026-03-14 — Completed Plan 03-01: JWT and role dependencies
+Plan: 2 of 2 in current phase (03-02 completed)
+Status: Phase 3 complete
+Last activity: 2026-03-14 — Completed Plan 03-02: Auth HTTP endpoints and integration tests
 
-Progress: [█████████░] 86%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [█████████░] 86%
 *Updated after each plan completion*
 | Phase 01-schema-and-configuration P02 | 120 | 2 tasks | 3 files |
 | Phase 02-auth-service-core P03 | 15 | 2 tasks | 4 files |
+| Phase 03 P02 | 15 | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,7 @@ Recent decisions affecting current work:
 - Roadmap: OTP dev fallback gated on explicit SINODIK_OTP_PLAINTEXT_FALLBACK boolean (default False)
 - Roadmap: Standardize on SINODIK_ADMIN_EMAIL (singular) for first-admin bootstrap
 - AUTH-02/03/04: Implement OTP with SHA-256 hashing, constant-time comparison, rate limiting
+- [Phase 03]: Auth routes use Docker-safe imports (no app. prefix); tests mock verify_otp/rate_limit/me deps to avoid TestClient loop issues
 
 ### Pending Todos
 
@@ -78,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T20:07:36.880Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-auth-routes-and-dependencies/03-CONTEXT.md
+Last session: 2026-03-14T20:28:32.405Z
+Stopped at: Completed 03-02-PLAN.md
+Resume file: None
