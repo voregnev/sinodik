@@ -79,7 +79,7 @@ class Person(Base):
     # passive_deletes=True → при удалении Person каскад делает БД (ON DELETE CASCADE),
     # ORM не пытается выставить person_id = NULL (что ломает NOT NULL).
     commemorations = relationship(
-        "Commemoration",
+        "models.models.Commemoration",
         back_populates="person",
         passive_deletes=True,
     )
@@ -91,6 +91,7 @@ class Person(Base):
             postgresql_using="gin",
             postgresql_ops={"canonical_name": "gin_trgm_ops"},
         ),
+        {"extend_existing": True},
     )
 
     def __repr__(self):
@@ -132,7 +133,9 @@ class Order(Base):
     period_type = Column(String(30), nullable=True)  # разовое | сорокоуст | полгода | год
 
     # Все поминовения из этого заказа
-    commemorations = relationship("Commemoration", back_populates="order")
+    commemorations = relationship("models.models.Commemoration", back_populates="order")
+
+    __table_args__ = ({"extend_existing": True},)
 
     def __repr__(self):
         return f"<Order #{self.id} from={self.user_email} ch={self.source_channel}>"
@@ -194,14 +197,13 @@ class Commemoration(Base):
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
     # ── ORM relationships ──
-    person = relationship("Person", back_populates="commemorations")
-    order = relationship("Order", back_populates="commemorations")
+    person = relationship("models.models.Person", back_populates="commemorations")
+    order = relationship("models.models.Order", back_populates="commemorations")
 
     __table_args__ = (
-        # Быстрая выборка активных записей
         Index("ix_comm_active", "is_active", "expires_at"),
-        # Быстрая выборка по типу + дата
         Index("ix_comm_type_expires", "order_type", "expires_at"),
+        {"extend_existing": True},
     )
 
     def __repr__(self):
@@ -224,6 +226,7 @@ class User(Base):
     Роль admin назначается если email присутствует в settings.admin_emails.
     """
     __tablename__ = "users"
+    __table_args__ = ({"extend_existing": True},)
 
     id = Column(Integer, primary_key=True)
     email = Column(String(255), nullable=False, unique=True, index=True)
@@ -247,6 +250,7 @@ class OtpCode(Base):
     attempt_count: счётчик неудачных попыток; при >= 5 код инвалидируется (Phase 2).
     """
     __tablename__ = "otp_codes"
+    __table_args__ = ({"extend_existing": True},)
 
     id = Column(Integer, primary_key=True)
     email = Column(String(255), nullable=False, index=True)
