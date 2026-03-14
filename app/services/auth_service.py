@@ -13,7 +13,7 @@ import secrets
 import hashlib
 import hmac
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 import logging
 
@@ -46,7 +46,7 @@ async def check_rate_limit(email: str, db_session: AsyncSession, time_window_min
     Returns:
         True if within rate limit, False if exceeded
     """
-    time_threshold = datetime.now(datetime.UTC)- timedelta(minutes=time_window_minutes)
+    time_threshold = datetime.now(timezone.utc)- timedelta(minutes=time_window_minutes)
 
     # Count the number of OTP requests in the time window
     stmt = select(OtpCode).where(
@@ -92,7 +92,7 @@ async def request_otp(email: str, db_session: AsyncSession) -> Dict[str, Any]:
     otp_hash = hashlib.sha256(otp_code.encode()).hexdigest()
 
     # Set expiration time (10 minutes from now)
-    expires_at = datetime.now(datetime.UTC)+ timedelta(minutes=10)
+    expires_at = datetime.now(timezone.utc)+ timedelta(minutes=10)
 
     # Create new OTP code record
     otp_record = OtpCode(
@@ -279,8 +279,8 @@ def create_jwt_token(email: str, role: str) -> str:
     payload = {
         "sub": email,  # Subject (user identifier)
         "role": role,  # User role
-        "exp": datetime.now(datetime.UTC)+ timedelta(days=settings.jwt_ttl_days),  # Expiration
-        "iat": datetime.now(datetime.UTC) # Issued at
+        "exp": datetime.now(timezone.utc)+ timedelta(days=settings.jwt_ttl_days),  # Expiration
+        "iat": datetime.now(timezone.utc) # Issued at
     }
 
     token = jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
