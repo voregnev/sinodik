@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 const API = "/api/v1";
+const AUTH_KEY = "sinodik_token";
 
 // ─── Theme ────────────────────────────────────────────────
 const T = {
@@ -1659,6 +1660,33 @@ const TABS = [
 
 export default function SinodikApp() {
   const [tab, setTab] = useState("today");
+  const [token, setToken] = useState(null);
+  const [user, setUser] = useState(null);
+
+  // Hydrate user from localStorage token on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(AUTH_KEY);
+    if (!stored) {
+      setUser(null);
+      return;
+    }
+    fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${stored}` } })
+      .then((res) => {
+        if (res.status === 401) {
+          localStorage.removeItem(AUTH_KEY);
+          setToken(null);
+          setUser(null);
+          return;
+        }
+        if (res.ok) {
+          return res.json().then((data) => {
+            setToken(stored);
+            setUser(data);
+          });
+        }
+      })
+      .catch(() => setUser(null));
+  }, []);
 
   return (
     <div style={{
