@@ -7,7 +7,7 @@
 
 ### Authentication
 
-- [ ] **AUTH-01**: Anonymous user can submit an order with names only (no email required)
+- [x] **AUTH-01**: Anonymous user can submit an order with names only (no email required)
 - [ ] **AUTH-02**: User can request a one-time code by providing their email address
 - [ ] **AUTH-03**: User receives the OTP via email (SMTP); code is returned in the API response when SMTP is not configured
 - [ ] **AUTH-04**: User can verify the OTP code and receive a JWT session token
@@ -20,7 +20,7 @@
 ### User Features
 
 - [ ] **USER-01**: Authenticated user can view their own orders (matched by email — includes historical CSV orders)
-- [ ] **USER-02**: Authenticated user's new orders are automatically linked to their account email
+- [x] **USER-02**: Authenticated user's new orders are automatically linked to their account email
 - [ ] **USER-03**: User can log out (client-side: discard JWT)
 
 ### Admin Features
@@ -36,7 +36,7 @@
 
 ### Bootstrap
 
-- [ ] **BOOT-01**: First admin account is seeded via `SINODIK_ADMIN_EMAILS` env var (checked at account creation time)
+- [x] **BOOT-01**: First admin account is seeded via `SINODIK_ADMIN_EMAILS` env var (checked at account creation time)
 
 ### Frontend
 
@@ -80,7 +80,7 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 1 | Pending |
+| AUTH-01 | Phase 1 | Complete |
 | AUTH-02 | Phase 2 | Pending |
 | AUTH-03 | Phase 2 | Pending |
 | AUTH-04 | Phase 2 | Pending |
@@ -90,7 +90,7 @@
 | AUTH-08 | Phase 2 | Pending |
 | AUTH-09 | Phase 2 | Pending |
 | USER-01 | Phase 4 | Pending |
-| USER-02 | Phase 1 | Pending |
+| USER-02 | Phase 1 | Complete |
 | USER-03 | Phase 3 | Pending |
 | ADMN-01 | Phase 4 | Pending |
 | ADMN-02 | Phase 4 | Pending |
@@ -100,7 +100,7 @@
 | ADMN-06 | Phase 4 | Pending |
 | ADMN-07 | Phase 4 | Pending |
 | ADMN-08 | Phase 4 | Pending |
-| BOOT-01 | Phase 1 | Pending |
+| BOOT-01 | Phase 1 | Complete |
 | FRNT-01 | Phase 5 | Pending |
 | FRNT-02 | Phase 5 | Pending |
 | FRNT-03 | Phase 5 | Pending |
