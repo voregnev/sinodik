@@ -60,7 +60,7 @@ Each task was committed atomically:
 
 1. **Task 1: Create app/api/deps.py and tests/test_auth_deps.py** - `1a1475d` (feat)
 
-**Plan metadata:** `7ee9276` (docs: complete 03-01 plan)
+**Plan metadata:** `9b17663` (docs: complete 03-01 plan)
 
 ## Self-Check: PASSED
 
