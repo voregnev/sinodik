@@ -26,10 +26,10 @@
 ### Admin Features
 
 - [x] **ADMN-01**: Admin can view all orders across all users
-- [ ] **ADMN-02**: Admin can view all user accounts (email, role, active status, created date)
-- [ ] **ADMN-03**: Admin can promote a user to admin role
-- [ ] **ADMN-04**: Admin can demote an admin to user role
-- [ ] **ADMN-05**: Admin can disable a user account (is_active = false; disabled user's JWT is rejected)
+- [x] **ADMN-02**: Admin can view all user accounts (email, role, active status, created date)
+- [x] **ADMN-03**: Admin can promote a user to admin role
+- [x] **ADMN-04**: Admin can demote an admin to user role
+- [x] **ADMN-05**: Admin can disable a user account (is_active = false; disabled user's JWT is rejected)
 - [x] **ADMN-06**: Admin can edit any commemoration record
 - [x] **ADMN-07**: Admin can delete any commemoration record
 - [x] **ADMN-08**: CSV upload is restricted to admin role only
@@ -93,10 +93,10 @@
 | USER-02 | Phase 1 | Complete |
 | USER-03 | Phase 3 | Complete |
 | ADMN-01 | Phase 4 | Complete |
-| ADMN-02 | Phase 4 | Pending |
-| ADMN-03 | Phase 4 | Pending |
-| ADMN-04 | Phase 4 | Pending |
-| ADMN-05 | Phase 4 | Pending |
+| ADMN-02 | Phase 4 | Complete |
+| ADMN-03 | Phase 4 | Complete |
+| ADMN-04 | Phase 4 | Complete |
+| ADMN-05 | Phase 4 | Complete |
 | ADMN-06 | Phase 4 | Complete |
 | ADMN-07 | Phase 4 | Complete |
 | ADMN-08 | Phase 4 | Complete |
