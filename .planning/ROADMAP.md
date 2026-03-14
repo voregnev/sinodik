@@ -15,7 +15,7 @@ This milestone adds OTP-based authentication, JWT sessions, and two-role RBAC to
 - [ ] **Phase 2: Auth Service Core** - OTP generation, verification, JWT issuance, and email delivery
 - [ ] **Phase 3: Auth Routes and Dependencies** - HTTP endpoints, FastAPI dependency injection, and logout flow
 - [ ] **Phase 4: Protected Routes and Admin Endpoints** - Guard existing routes, add user-scoped and admin endpoints
-- [ ] **Phase 5: Frontend Auth Integration** - Login screen, My Orders tab, admin panel, and auth state management
+- [x] **Phase 5: Frontend Auth Integration** - Login screen, My Orders tab, admin panel, and auth state management (completed 2026-03-14)
 
 ## Phase Details
 
@@ -114,4 +114,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Auth Service Core | 0/3 | Not started | - |
 | 3. Auth Routes and Dependencies | 0/2 | Not started | - |
 | 4. Protected Routes and Admin Endpoints | 3/4 | In Progress|  |
-| 5. Frontend Auth Integration | 3/4 | In Progress|  |
+| 5. Frontend Auth Integration | 4/4 | Complete   | 2026-03-14 |
