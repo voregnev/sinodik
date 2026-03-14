@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 2 context gathered
-last_updated: "2026-03-14T15:11:22.629Z"
-last_activity: "2026-03-14 — Completed Plan 01-01: Auth configuration fields"
+last_updated: "2026-03-14T15:35:00.000Z"
+last_activity: "2026-03-14 — Completed Plan 02-01: Core authentication service"
 progress:
   total_phases: 5
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 50
+  completed_phases: 2
+  total_plans: 3
+  completed_plans: 3
+  percent: 60
 ---
 
 # Project State
@@ -21,33 +21,33 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-14)
 
 **Core value:** A submitter who logs in with their email sees exactly their commemorations — past and present — without accessing anyone else's data.
-**Current focus:** Phase 1 — Schema and Configuration
+**Current focus:** Phase 2 — Auth Service Core
 
 ## Current Position
 
-Phase: 1 of 5 (Schema and Configuration)
-Plan: 1 of 2 in current phase
-Status: Execution in progress
-Last activity: 2026-03-14 — Completed Plan 01-01: Auth configuration fields
+Phase: 2 of 5 (Auth Service Core)
+Plan: 1 of 3 in current phase
+Status: Plan 02-01 completed
+Last activity: 2026-03-14 — Completed Plan 02-01: Core authentication service
 
-Progress: [█████░░░░░] 50%
+Progress: [███████░░░] 70%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 3
+- Average duration: 5 min
+- Total execution time: 0.1 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 02-auth-service-core | 1 | 2 tasks | 2 files |
 
 **Recent Trend:**
-- Last 5 plans: -
-- Trend: -
+- Last 5 plans: 02-01 | 5min | Complete auth service
+- Trend: On pace
 
 *Updated after each plan completion*
 | Phase 01-schema-and-configuration P02 | 120 | 2 tasks | 3 files |
@@ -64,6 +64,7 @@ Recent decisions affecting current work:
 - Roadmap: JWT stateless sessions — no Redis dependency, fits existing stack
 - Roadmap: OTP dev fallback gated on explicit SINODIK_OTP_PLAINTEXT_FALLBACK boolean (default False)
 - Roadmap: Standardize on SINODIK_ADMIN_EMAIL (singular) for first-admin bootstrap
+- AUTH-02/03/04: Implement OTP with SHA-256 hashing, constant-time comparison, rate limiting
 
 ### Pending Todos
 
@@ -76,6 +77,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T15:11:22.617Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-auth-service-core/02-CONTEXT.md
+Last session: 2026-03-14T15:35:00.000Z
+Stopped at: Completed Plan 02-01: Core authentication service
+Resume file: .planning/phases/02-auth-service-core/02-01-SUMMARY.md
