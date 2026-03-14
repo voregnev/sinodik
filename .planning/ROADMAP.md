@@ -95,7 +95,13 @@ Plans:
   3. An authenticated user sees a "My Orders" tab showing their linked commemorations
   4. An admin sees an "Admin" tab with all orders and user management UI; the CSV upload tab is visible only to admins
   5. An anonymous user can still submit a записка via the order form without logging in
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Backend: add order_id to get_by_user and by-user response for Мои заказы grouping
+- [ ] 05-02-PLAN.md — Auth state, localStorage, fetch wrapper with Bearer and 401 handling
+- [ ] 05-03-PLAN.md — Login modal (email → OTP) and conditional tabs/header by role
+- [ ] 05-04-PLAN.md — Мои заказы screen and Податели section in БД tab
 
 ## Progress
 
