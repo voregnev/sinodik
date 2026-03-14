@@ -30,9 +30,9 @@
 - [ ] **ADMN-03**: Admin can promote a user to admin role
 - [ ] **ADMN-04**: Admin can demote an admin to user role
 - [ ] **ADMN-05**: Admin can disable a user account (is_active = false; disabled user's JWT is rejected)
-- [ ] **ADMN-06**: Admin can edit any commemoration record
-- [ ] **ADMN-07**: Admin can delete any commemoration record
-- [ ] **ADMN-08**: CSV upload is restricted to admin role only
+- [x] **ADMN-06**: Admin can edit any commemoration record
+- [x] **ADMN-07**: Admin can delete any commemoration record
+- [x] **ADMN-08**: CSV upload is restricted to admin role only
 
 ### Bootstrap
 
@@ -97,9 +97,9 @@
 | ADMN-03 | Phase 4 | Pending |
 | ADMN-04 | Phase 4 | Pending |
 | ADMN-05 | Phase 4 | Pending |
-| ADMN-06 | Phase 4 | Pending |
-| ADMN-07 | Phase 4 | Pending |
-| ADMN-08 | Phase 4 | Pending |
+| ADMN-06 | Phase 4 | Complete |
+| ADMN-07 | Phase 4 | Complete |
+| ADMN-08 | Phase 4 | Complete |
 | BOOT-01 | Phase 1 | Complete |
 | FRNT-01 | Phase 5 | Pending |
 | FRNT-02 | Phase 5 | Pending |
