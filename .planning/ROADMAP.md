@@ -30,7 +30,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Application startup fails with a clear error if `SINODIK_JWT_SECRET` is unset
   4. Anonymous order submission still works without authentication (existing behavior preserved)
   5. New orders are stored with `user_email` from the submission (linkage field ready for auth)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Auth config fields in Settings + Phase 1 test scaffold
+- [ ] 01-02-PLAN.md — User and OtpCode ORM models + migration 0006
 
 ### Phase 2: Auth Service Core
 **Goal**: The complete OTP-to-JWT flow works as tested business logic, independent of HTTP — OTPs are generated, hashed, sent via email, verified securely, and accounts are created automatically
@@ -86,7 +90,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Schema and Configuration | 0/TBD | Not started | - |
+| 1. Schema and Configuration | 0/2 | Not started | - |
 | 2. Auth Service Core | 0/TBD | Not started | - |
 | 3. Auth Routes and Dependencies | 0/TBD | Not started | - |
 | 4. Protected Routes and Admin Endpoints | 0/TBD | Not started | - |
