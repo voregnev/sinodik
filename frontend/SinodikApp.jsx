@@ -836,8 +836,19 @@ function UploadPage() {
     let url = `${API}/upload/csv?delimiter=;`;
     if (startsAt) url += `&starts_at=${startsAt}T00:00:00`;
 
+    const headers = {};
+    if (authRef.current?.token) headers.Authorization = `Bearer ${authRef.current.token}`;
+
     try {
-      const res = await fetch(url, { method: "POST", body: formData });
+      const res = await fetch(url, { method: "POST", body: formData, headers });
+      if (res.status === 401) {
+        localStorage.removeItem(AUTH_KEY);
+        authRef.current?.setToken?.(null);
+        authRef.current?.setUser?.(null);
+        setResult({ error: "Сессия истекла. Войдите снова." });
+        setUploading(false);
+        return;
+      }
       const data = await res.json();
       setResult(data);
     } catch (e) {
@@ -1692,52 +1703,6 @@ function PersonManager() {
                   </button>
                 </div>
               )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MyOrdersPage() {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    api("/orders").then((data) => {
-      setOrders(Array.isArray(data) ? data : data?.items || []);
-      setLoading(false);
-    });
-  }, []);
-
-  if (loading) return <Loading />;
-
-  return (
-    <div style={{ padding: 16 }}>
-      <h2 style={{ margin: "0 0 16px", color: T.gold, fontSize: 20, fontFamily: "'Cormorant Garamond', serif" }}>
-        Мои заказы
-      </h2>
-      {orders.length === 0 ? (
-        <Empty msg="" />
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {orders.map((order) => (
-            <div
-              key={order.id}
-              style={{
-                padding: "12px 14px", background: T.card, borderRadius: 8,
-                borderLeft: `3px solid ${T.gold}`,
-              }}
-            >
-              <div style={{ color: T.text, fontSize: 14, fontFamily: "'Cormorant Garamond', serif" }}>
-                Записка #{order.id}
-              </div>
-              <div style={{ color: T.dim, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", marginTop: 4 }}>
-                {order.ordered_at ? order.ordered_at.slice(0, 10) : order.created_at?.slice(0, 10) || "—"}
-                {order.source_channel ? ` · ${order.source_channel}` : ""}
-              </div>
             </div>
           ))}
         </div>
