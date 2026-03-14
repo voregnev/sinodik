@@ -1675,7 +1675,92 @@ export default function SinodikApp() {
   const [tab, setTab] = useState("today");
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [loginStep, setLoginStep] = useState("email");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loginOtpCode, setLoginOtpCode] = useState("");
+  const [loginSubmitting, setLoginSubmitting] = useState(false);
   authRef.current = { token, setToken, setUser };
+
+  const openLogin = () => {
+    setLoginOpen(true);
+    setLoginStep("email");
+    setLoginEmail("");
+    setLoginError("");
+    setLoginOtpCode("");
+  };
+
+  const closeLogin = () => {
+    setLoginOpen(false);
+    setLoginStep("email");
+    setLoginEmail("");
+    setLoginError("");
+    setLoginOtpCode("");
+  };
+
+  const handleRequestOtp = async () => {
+    const email = loginEmail.trim();
+    if (!email) return;
+    setLoginSubmitting(true);
+    setLoginError("");
+    try {
+      const res = await fetch(`${API}/auth/request-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (res.status === 429) {
+        setLoginError("Слишком много запросов");
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setLoginError(body.detail || "Ошибка");
+        return;
+      }
+      if (res.status === 202) {
+        setLoginStep("otp");
+        setLoginError("");
+      }
+    } finally {
+      setLoginSubmitting(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    const email = loginEmail.trim();
+    const code = loginOtpCode.trim();
+    if (!email || !code) return;
+    setLoginSubmitting(true);
+    setLoginError("");
+    try {
+      const res = await fetch(`${API}/auth/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
+      });
+      if (res.status === 401) {
+        setLoginError("Неверный или истёкший код");
+        return;
+      }
+      if (!res.ok) {
+        setLoginError("Ошибка");
+        return;
+      }
+      const data = await res.json();
+      const newToken = data.token;
+      const userData = data.user;
+      if (newToken && userData) {
+        localStorage.setItem(AUTH_KEY, newToken);
+        setToken(newToken);
+        setUser(userData);
+        closeLogin();
+      }
+    } finally {
+      setLoginSubmitting(false);
+    }
+  };
 
   // Hydrate user from localStorage token on mount
   useEffect(() => {
@@ -1711,20 +1796,124 @@ export default function SinodikApp() {
     }}>
       <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
 
-      {/* Header */}
-      <div style={{
-        padding: "14px 16px", display: "flex", alignItems: "center", gap: 10,
-        background: T.surface, borderBottom: `1px solid ${T.border}`,
-      }}>
-        <span style={{ fontSize: 24 }}>☦️</span>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: T.gold, letterSpacing: 2 }}>
-            СИНОДИК
-          </div>
-          <div style={{ fontSize: 9, color: T.dim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
-            ЗАПИСКИ ДЛЯ ПОМИНОВЕНИЯ
+      {/* Login modal: one popup, email → OTP, errors at top, no code-sent hint, no Back on OTP */}
+      {loginOpen && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000,
+            background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={(e) => e.target === e.currentTarget && closeLogin()}
+        >
+          <div
+            style={{
+              background: T.card, borderRadius: 12, border: `1px solid ${T.border}`,
+              padding: 24, width: "100%", maxWidth: 360,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <span style={{ color: T.gold, fontSize: 18, fontWeight: 700, fontFamily: "'Cormorant Garamond', serif" }}>
+                Вход
+              </span>
+              <button onClick={closeLogin} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}>
+                <Icon d={Icons.x} size={20} color={T.dim} />
+              </button>
+            </div>
+            {loginError && (
+              <div style={{
+                marginBottom: 12, padding: 10, borderRadius: 8,
+                background: T.red + "15", border: `1px solid ${T.red}44`,
+                color: T.red, fontSize: 12, fontFamily: "'JetBrains Mono', monospace",
+              }}>
+                {loginError}
+              </div>
+            )}
+            {loginStep === "email" ? (
+              <>
+                <label style={LabelStyle()}>Email</label>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="example@mail.ru"
+                  style={{ ...InputStyle(), marginBottom: 16 }}
+                  onKeyDown={(e) => e.key === "Enter" && handleRequestOtp()}
+                />
+                <button
+                  onClick={handleRequestOtp}
+                  disabled={loginSubmitting || !loginEmail.trim()}
+                  style={{
+                    width: "100%", padding: 12, borderRadius: 8, border: "none",
+                    background: T.gold, color: T.bg, fontSize: 14, fontWeight: 600,
+                    cursor: loginSubmitting ? "wait" : "pointer", fontFamily: "'JetBrains Mono', monospace",
+                    opacity: loginSubmitting || !loginEmail.trim() ? 0.6 : 1,
+                  }}
+                >
+                  {loginSubmitting ? "Отправка..." : "Получить код"}
+                </button>
+              </>
+            ) : (
+              <>
+                <label style={LabelStyle()}>Код из письма</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={loginOtpCode}
+                  onChange={(e) => setLoginOtpCode(e.target.value)}
+                  placeholder="Введите код"
+                  style={{ ...InputStyle(), marginBottom: 16 }}
+                  onKeyDown={(e) => e.key === "Enter" && handleVerifyOtp()}
+                />
+                <button
+                  onClick={handleVerifyOtp}
+                  disabled={loginSubmitting || !loginOtpCode.trim()}
+                  style={{
+                    width: "100%", padding: 12, borderRadius: 8, border: "none",
+                    background: T.gold, color: T.bg, fontSize: 14, fontWeight: 600,
+                    cursor: loginSubmitting ? "wait" : "pointer", fontFamily: "'JetBrains Mono', monospace",
+                    opacity: loginSubmitting || !loginOtpCode.trim() ? 0.6 : 1,
+                  }}
+                >
+                  {loginSubmitting ? "Проверка..." : "Войти"}
+                </button>
+              </>
+            )}
           </div>
         </div>
+      )}
+
+      {/* Header */}
+      <div style={{
+        padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+        background: T.surface, borderBottom: `1px solid ${T.border}`,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 24 }}>☦️</span>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: T.gold, letterSpacing: 2 }}>
+              СИНОДИК
+            </div>
+            <div style={{ fontSize: 9, color: T.dim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+              ЗАПИСКИ ДЛЯ ПОМИНОВЕНИЯ
+            </div>
+          </div>
+        </div>
+        {!user && (
+          <button
+            onClick={openLogin}
+            style={{
+              padding: "8px 14px", borderRadius: 8, border: `1px solid ${T.gold}44`,
+              background: T.gold + "22", color: T.gold, cursor: "pointer",
+              fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            Войти
+          </button>
+        )}
       </div>
 
       {/* Content */}
