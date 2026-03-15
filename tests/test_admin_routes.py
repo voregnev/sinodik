@@ -1,4 +1,4 @@
-"""Admin routes: GET /admin/users (list with counts), PATCH /admin/users/{id} (role, is_active, last-admin guard)."""
+"""Admin routes: GET /admin/users (list with counts, excludes superuser), PATCH /admin/users/{id}, DELETE /admin/users/{id}."""
 
 import os
 import sys
@@ -76,6 +76,91 @@ def test_get_admin_users_admin_token_returns_200_with_counts():
             assert "orders_count" in item
             assert "active_commemoration_count" in item
     finally:
+        del app.dependency_overrides[deps_module.require_admin]
+
+
+@pytest.mark.asyncio
+async def test_get_admin_users_excludes_superuser():
+    """GET /admin/users does not include the superuser (filtered out)."""
+    try:
+        from config import settings
+    except ImportError:
+        from app.config import settings
+    from httpx import ASGITransport, AsyncClient
+    session_factory = _make_session_factory()
+    superuser_email = settings.superuser_email
+    u = await _ensure_user_async(session_factory, superuser_email, "admin")
+    async def override_get_db():
+        async with session_factory() as session:
+            yield session
+    app.dependency_overrides[get_db] = override_get_db
+    mock_admin = MagicMock()
+    mock_admin.email = superuser_email
+    mock_admin.role = "admin"
+    mock_admin.is_active = True
+    async def override_require_admin_ok():
+        return mock_admin
+    app.dependency_overrides[deps_module.require_admin] = override_require_admin_ok
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            resp = await ac.get(ADMIN_USERS, headers={"Authorization": "Bearer any"})
+        assert resp.status_code == 200
+        data = resp.json()
+        emails = [x["email"] for x in data]
+        assert superuser_email not in emails
+    finally:
+        del app.dependency_overrides[get_db]
+        del app.dependency_overrides[deps_module.require_admin]
+
+
+@pytest.mark.asyncio
+async def test_delete_user_204():
+    """DELETE /admin/users/{id} for non-superuser returns 204."""
+    from httpx import ASGITransport, AsyncClient
+    session_factory = _make_session_factory()
+    admin = await _ensure_user_async(session_factory, "admin_for_delete@example.com", "admin")
+    user = await _ensure_user_async(session_factory, "delete_me@example.com", "user")
+    async def override_get_db():
+        async with session_factory() as session:
+            yield session
+    app.dependency_overrides[get_db] = override_get_db
+    async def override_require_admin_ok():
+        return admin
+    app.dependency_overrides[deps_module.require_admin] = override_require_admin_ok
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            resp = await ac.delete(f"{ADMIN_USERS}/{user.id}")
+        assert resp.status_code == 204
+    finally:
+        del app.dependency_overrides[get_db]
+        del app.dependency_overrides[deps_module.require_admin]
+
+
+@pytest.mark.asyncio
+async def test_delete_superuser_400():
+    """DELETE /admin/users/{id} for superuser returns 400."""
+    try:
+        from config import settings
+    except ImportError:
+        from app.config import settings
+    from httpx import ASGITransport, AsyncClient
+    session_factory = _make_session_factory()
+    superuser_email = settings.superuser_email
+    u = await _ensure_user_async(session_factory, superuser_email, "admin")
+    async def override_get_db():
+        async with session_factory() as session:
+            yield session
+    app.dependency_overrides[get_db] = override_get_db
+    async def override_require_admin_ok():
+        return u
+    app.dependency_overrides[deps_module.require_admin] = override_require_admin_ok
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            resp = await ac.delete(f"{ADMIN_USERS}/{u.id}")
+        assert resp.status_code == 400
+        assert "superuser" in (resp.json().get("detail") or "").lower()
+    finally:
+        del app.dependency_overrides[get_db]
         del app.dependency_overrides[deps_module.require_admin]
 
 

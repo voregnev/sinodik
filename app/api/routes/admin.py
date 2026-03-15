@@ -52,6 +52,7 @@ async def list_users(
     stmt = select(User, orders_subq.label("orders_count"), active_comm_subq.label("active_commemoration_count"))
     result = await db.execute(stmt)
     rows = result.all()
+    superuser_lower = settings.superuser_email.lower()
     return [
         {
             "id": u.id,
@@ -63,6 +64,7 @@ async def list_users(
             "active_commemoration_count": acc,
         }
         for u, oc, acc in rows
+        if u.email.lower() != superuser_lower
     ]
 
 
@@ -110,3 +112,36 @@ async def patch_user(
         "is_active": user.is_active,
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }
+
+
+@router.delete("/users/{user_id}", status_code=204)
+async def delete_user(
+    user_id: int,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete user by id. Returns 400 for superuser. Admin only."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.email.lower() == settings.superuser_email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete the superuser account",
+        )
+    count_result = await db.execute(
+        select(func.count(User.id)).where(
+            User.role == "admin",
+            User.is_active == True,
+        )
+    )
+    active_admin_count = count_result.scalar() or 0
+    if active_admin_count == 1 and user.role == "admin" and user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete the last admin",
+        )
+    await db.delete(user)
+    await db.commit()
+    return None
