@@ -31,7 +31,7 @@ Plan: 02 of 04 in current phase (05-02 completed)
 Current Plan: 4
 Total Plans in Phase: 04
 Status: Phase 5 in progress
-Last activity: 2026-03-15 - Completed quick task 3: solve login mess, superadmin password login via UI, auth review
+Last activity: 2026-03-15 - Completed quick task 4: admin БД — список подателей как Словарь имён, без суперпользователя
 Last Activity: 2026-03-15
 
 Progress: [█████████░] 87%
@@ -99,6 +99,7 @@ None yet.
 | 1 | After login, order form email pre-filled from login and read-only | 2026-03-15 | 300b081 | [1-after-user-login-field-e-mail-should-be-](./quick/1-after-user-login-field-e-mail-should-be-) |
 | 2 | Add superuser (login/password from .env), exists at startup, cannot be deleted | 2026-03-15 | ab5686e | [2-add-superuser-with-login-admin-and-passw](./quick/2-add-superuser-with-login-admin-and-passw/) |
 | 3 | Solve login mess: cannot login with super admin password; auth review and rewrite login flow | 2026-03-15 | 87f91dd | [3-solve-login-mess-cannot-login-with-super](./quick/3-solve-login-mess-cannot-login-with-super/) |
+| 4 | Admin БД: exclude superuser from users list; Податели UI like Names (edit, delete, Заказы); list on demand; Заказы → tab with filter | 2026-03-15 | e461395 | [4-admin-db-exclude-superuser-from-users-li](./quick/4-admin-db-exclude-superuser-from-users-li/) |
 
 ## Session Continuity
 
