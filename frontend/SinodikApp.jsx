@@ -393,7 +393,7 @@ function SearchPage() {
   );
 }
 
-function AddPage() {
+function AddPage({ user = null }) {
   const INITIAL_NAME_FIELDS = 5;
   const [form, setForm] = useState({
     orderType: "О здравии",
@@ -412,6 +412,10 @@ function AddPage() {
   const suggestTimerRef = useRef(null);
   const lastFieldRef = useRef(null);
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
+
+  useEffect(() => {
+    if (user?.email) setForm(f => ({ ...f, userEmail: user.email }));
+  }, [user]);
 
   const fetchSuggestions = useCallback(async (q) => {
     if (!q || q.trim().length < 2) {
@@ -490,7 +494,7 @@ function AddPage() {
           nameFields: Array(INITIAL_NAME_FIELDS).fill(""),
           startsAt: "",
           notifyAccept: false,
-          userEmail: "",
+          userEmail: user?.email ?? "",
         }));
       }
     } catch (e) {
@@ -687,7 +691,8 @@ function AddPage() {
           <input
             type="email"
             value={form.userEmail}
-            onChange={e => setForm(f => ({ ...f, userEmail: e.target.value }))}
+            onChange={user ? undefined : e => setForm(f => ({ ...f, userEmail: e.target.value }))}
+            readOnly={!!user}
             placeholder="example@mail.ru"
             style={{ ...inputSt, marginTop: 4 }}
           />
@@ -2150,19 +2155,19 @@ export default function SinodikApp() {
       {/* Content: guest = form only; user = tabs; admin = full tabs */}
       <div style={{ flex: 1, overflowY: "auto", paddingBottom: visibleTabs ? 70 : 16 }}>
         {!user ? (
-          <AddPage />
+          <AddPage user={null} />
         ) : user.role === "admin" ? (
           <>
             {tab === "today" && <TodayPage />}
             {tab === "search" && <SearchPage />}
-            {tab === "add" && <AddPage />}
+            {tab === "add" && <AddPage user={user} />}
             {tab === "upload" && <UploadPage />}
             {tab === "stats" && <StatsPage />}
             {tab === "db" && <DbManagePage user={user} />}
           </>
         ) : (
           <>
-            {tab === "add" && <AddPage />}
+            {tab === "add" && <AddPage user={user} />}
             {tab === "myOrders" && <MyOrdersPage />}
           </>
         )}
