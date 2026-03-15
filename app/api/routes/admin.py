@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Literal
 
 from api.deps import require_admin
+from config import settings
 from database import get_db
 from models.models import User
 from models import Order, Commemoration
@@ -77,6 +78,11 @@ async def patch_user(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.email.lower() == settings.superuser_email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot modify or disable the superuser account",
+        )
     if body.role is not None or body.is_active is not None:
         if body.role == "user" or body.is_active is False:
             count_result = await db.execute(
