@@ -113,6 +113,8 @@ All env vars use **`SINODIK_` prefix** (defined in `app/config.py`):
 | `SINODIK_EMBEDDING_API_KEY` | Embedding API key |
 | `SINODIK_EMBEDDING_DIM` | Vector dimension (default: 384) |
 | `SINODIK_DEDUP_THRESHOLD` | Cosine similarity dedup threshold (default: 0.85) |
+| `SINODIK_SUPERUSER_EMAIL` | Superuser email; used for password login and nginx Basic Auth |
+| `SINODIK_SUPERUSER_PASSWORD` | Optional; if set, superuser can log in with password (hash stored at startup) |
 
 ## Docker Services
 
