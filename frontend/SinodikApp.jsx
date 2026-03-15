@@ -171,7 +171,7 @@ const PERIOD_ORDER = ["год", "полгода", "сорокоуст", "раз�
 const PERIOD_LABELS = {
   "год": "Год",
   "полгода": "Полгода",
-  "сорокоуст": "Сорокоуст (40 дней)",
+  "сорокоуст": "Соркоуст",
   "разовое": "Разовое",
 };
 
@@ -397,7 +397,7 @@ function AddPage({ user = null }) {
   const INITIAL_NAME_FIELDS = 5;
   const [form, setForm] = useState({
     orderType: "О здравии",
-    periodType: "Сорокоуст (40 дней)",
+    periodType: "Соркоуст",
     nameFields: Array(INITIAL_NAME_FIELDS).fill(""),
     startsAt: "",
     notifyAccept: false,
@@ -535,7 +535,7 @@ function AddPage({ user = null }) {
       {/* Period */}
       <label style={labelSt}>Срок поминовения</label>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-        {["Разовое (не выбрано)", "Сорокоуст (40 дней)", "На полгода", "На год"].map(p => (
+        {["Разовое (не выбрано)", "Соркоуст", "На полгода", "На год"].map(p => (
           <button key={p} onClick={() => setForm(f => ({ ...f, periodType: p }))} style={{
             padding: "10px 8px", borderRadius: 8, border: "none", cursor: "pointer",
             fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
@@ -1874,6 +1874,7 @@ export default function SinodikApp() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginStep, setLoginStep] = useState("email");
   const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginOtpCode, setLoginOtpCode] = useState("");
   const [loginSubmitting, setLoginSubmitting] = useState(false);
@@ -1883,6 +1884,7 @@ export default function SinodikApp() {
     setLoginOpen(true);
     setLoginStep("email");
     setLoginEmail("");
+    setLoginPassword("");
     setLoginError("");
     setLoginOtpCode("");
   };
@@ -1891,6 +1893,7 @@ export default function SinodikApp() {
     setLoginOpen(false);
     setLoginStep("email");
     setLoginEmail("");
+    setLoginPassword("");
     setLoginError("");
     setLoginOtpCode("");
   };
@@ -1901,6 +1904,17 @@ export default function SinodikApp() {
     setLoginSubmitting(true);
     setLoginError("");
     try {
+      const methodRes = await fetch(`${API}/auth/login-method?email=${encodeURIComponent(email)}`);
+      if (!methodRes.ok) {
+        setLoginError("Ошибка");
+        return;
+      }
+      const { method } = await methodRes.json();
+      if (method === "password") {
+        setLoginStep("password");
+        setLoginError("");
+        return;
+      }
       const res = await fetch(`${API}/auth/request-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1918,6 +1932,41 @@ export default function SinodikApp() {
       if (res.status === 202) {
         setLoginStep("otp");
         setLoginError("");
+      }
+    } finally {
+      setLoginSubmitting(false);
+    }
+  };
+
+  const handlePasswordLogin = async () => {
+    const email = loginEmail.trim();
+    const password = loginPassword;
+    if (!email || !password) return;
+    setLoginSubmitting(true);
+    setLoginError("");
+    try {
+      const res = await fetch(`${API}/auth/password-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      if (res.status === 401) {
+        setLoginError("Неверные данные");
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setLoginError(body.detail || "Ошибка");
+        return;
+      }
+      const data = await res.json();
+      const newToken = data.token;
+      const userData = data.user;
+      if (newToken && userData) {
+        localStorage.setItem(AUTH_KEY, newToken);
+        setToken(newToken);
+        setUser(userData);
+        closeLogin();
       }
     } finally {
       setLoginSubmitting(false);
@@ -2064,6 +2113,30 @@ export default function SinodikApp() {
                   }}
                 >
                   {loginSubmitting ? "Отправка..." : "Получить код"}
+                </button>
+              </>
+            ) : loginStep === "password" ? (
+              <>
+                <label style={LabelStyle()}>Пароль</label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="Пароль"
+                  style={{ ...InputStyle(), marginBottom: 16 }}
+                  onKeyDown={(e) => e.key === "Enter" && handlePasswordLogin()}
+                />
+                <button
+                  onClick={handlePasswordLogin}
+                  disabled={loginSubmitting || !loginPassword}
+                  style={{
+                    width: "100%", padding: 12, borderRadius: 8, border: "none",
+                    background: T.gold, color: T.bg, fontSize: 14, fontWeight: 600,
+                    cursor: loginSubmitting ? "wait" : "pointer", fontFamily: "'JetBrains Mono', monospace",
+                    opacity: loginSubmitting || !loginPassword ? 0.6 : 1,
+                  }}
+                >
+                  {loginSubmitting ? "Отправка..." : "Войти"}
                 </button>
               </>
             ) : (
