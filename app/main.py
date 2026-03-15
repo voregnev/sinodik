@@ -37,6 +37,10 @@ async def lifespan(app: FastAPI):
             )
             session.add(user)
             await session.flush()
+        else:
+            # Ensure superuser always has admin role and is active (e.g. if they were first created via OTP as user)
+            user.role = "admin"
+            user.is_active = True
         if settings.superuser_password:
             # Use bcrypt directly to avoid passlib's internal 72-byte test triggering ValueError on some bcrypt versions
             import bcrypt

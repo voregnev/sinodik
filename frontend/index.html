@@ -19,7 +19,7 @@ body { background: #0c0f1a; color: #e8dcc8; font-family: system-ui, sans-serif; 
 <script src="/vendor/babel.min.js"></script>
 <script>
 (async function() {
-  var r = await fetch("SinodikApp.jsx");
+  var r = await fetch("/SinodikApp.jsx");
   var src = await r.text();
   src = src.replace(/^import\s*\{([^}]+)\}\s*from\s*["']react["'];?\s*$/m, "const {$1} = React;");
   src = src.replace(/^export\s+default\s+/m, "");

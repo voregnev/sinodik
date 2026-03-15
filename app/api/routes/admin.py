@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Literal
 
@@ -142,6 +142,8 @@ async def delete_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot delete the last admin",
         )
+    # Cascade: delete user's orders (DB will CASCADE delete commemorations via order_id FK)
+    await db.execute(delete(Order).where(Order.user_email == user.email))
     await db.delete(user)
     await db.commit()
     return None
