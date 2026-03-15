@@ -107,6 +107,11 @@ completed: "2026-03-14"
 
 - Five test modules exist and are collectible; placeholder tests for protected routes (upload, admin no-token) pass. Orders, names, commemorations already have auth in codebase; their tests pass. Fixtures available for 04-02–04-04.
 
+## Self-Check: PASSED
+
+- 04-01-SUMMARY.md present
+- Commits daaea2d (feat), e0477cb (docs) present
+
 ---
 *Phase: 04-protected-routes-and-admin-endpoints*
 *Completed: 2026-03-14*

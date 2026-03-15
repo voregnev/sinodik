@@ -80,7 +80,7 @@ function Connector({ label, sublabel, color = C.dim }) {
 // ─── Flow Example ─────────────────────────────────────────
 function FlowExample() {
   const steps = [
-    { label: "CSV строка / форма", color: C.cyan, content: '"Ангелины Анны отр.Тимофея" / Сорокоуст / О здравии · user_email при «Известить о принятии»' },
+    { label: "CSV строка / форма", color: C.cyan, content: '"Ангелины Анны отр.Тимофея" / Соркоуст / О здравии · user_email при «Известить о принятии»' },
     { label: "Order", color: C.blue, content: 'user_email · need_receipt · source: csv|form · external_id' },
     { label: "Name Parser", color: C.purple, content: '→ Ангелина, Анна, Тимофей [отрок] + suffix «со чадом»' },
     { label: "3× Commemoration", color: C.orange, content: '' },
@@ -150,7 +150,7 @@ function DatesExplain() {
         border: `1px solid ${C.border}`,
       }}>
         <div style={{ color: C.text, fontSize: 13, fontFamily: serif, fontWeight: 700, marginBottom: 12 }}>
-          Timeline: Сорокоуст (40 дней)
+          Timeline: Соркоуст
         </div>
         <div style={{ position: "relative", height: 50, margin: "0 10px" }}>
           {/* Line */}

@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     otp_plaintext_fallback: bool = False   # SINODIK_OTP_PLAINTEXT_FALLBACK
     superuser_email: str = "admin@example.com"   # SINODIK_SUPERUSER_EMAIL
     superuser_password: str | None = None         # SINODIK_SUPERUSER_PASSWORD (optional)
+    # When X-Remote-User (from nginx basic auth) equals superuser_email, request is treated as admin
 
     # SMTP
     smtp_host: str = "localhost"           # SINODIK_SMTP_HOST

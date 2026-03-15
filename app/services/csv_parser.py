@@ -26,7 +26,9 @@ _COL_ALIASES: dict[str, list[str]] = {
     "date":        ["date", "дата", "дата заказа", "ordered_at", "created"],
     "email":       ["email", "e-mail", "почта", "заказчик"],
     "order_type":  ["тип", "type", "тип записки", "тип_записок", "order_type"],
-    "period_raw":  ["период", "period", "radio", "срок", "long"],
+    # В некоторых CRM поле срока называется `long`, а `radio` может быть пустым.
+    # Поэтому сначала пробуем `long`, потом `radio`.
+    "period_raw":  ["период", "period", "long", "срок"],
     "names_raw":   ["комментарий", "comment", "names", "имена", "текст", "commemoration_names"],
 }
 

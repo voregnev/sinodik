@@ -166,11 +166,11 @@ async def search_names(
                 select(
                     Person.id,
                     Person.canonical_name,
-                    text("1 - (embedding <=> :vec::vector) AS vec_score"),
+                    text("1 - (embedding <=> :vec ::vector) AS vec_score"),
                 )
                 .where(text("embedding IS NOT NULL"))
                 .params(vec=str(embedding))
-                .order_by(text("embedding <=> :vec::vector"))
+                .order_by(text("embedding <=> :vec ::vector"))
                 .params(vec=str(embedding))
                 .limit(limit)
             )

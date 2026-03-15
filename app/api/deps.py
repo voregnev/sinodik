@@ -2,6 +2,7 @@
 Shared API dependencies for JWT verification and role checks.
 
 Use get_current_user to protect endpoints; require_admin for admin-only routes.
+X-Remote-User is only trusted on /auth/login (nginx Basic Auth); other endpoints use JWT only.
 """
 
 from fastapi import Depends, HTTPException, status
@@ -22,7 +23,7 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Validate Bearer JWT, load user by email (payload['sub']), return 401 if missing/invalid/inactive."""
+    """Validate Bearer JWT; return 401 if missing/invalid/inactive."""
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -59,7 +60,7 @@ async def get_current_user_optional(
     credentials: HTTPAuthorizationCredentials | None = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User | None:
-    """Validate Bearer JWT if present; load user by email (payload['sub']). Return None if missing/invalid/inactive."""
+    """Validate Bearer JWT if present; load user. Return None if missing/invalid/inactive."""
     if credentials is None:
         return None
     try:

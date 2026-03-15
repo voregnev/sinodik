@@ -1,6 +1,11 @@
 # Production override: no volume mounts — use built image only.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# With Traefik: nginx not exposed (Traefik handles 80/443).
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile prod up -d
 
 services:
   api:
     volumes: []
+  nginx:
+    ports: []
+    volumes:
+      - ./infra/nginx.conf:/etc/nginx/conf.d/default.conf

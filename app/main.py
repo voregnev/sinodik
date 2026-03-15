@@ -27,8 +27,6 @@ async def lifespan(app: FastAPI):
             __import__("sqlalchemy").text('CREATE EXTENSION IF NOT EXISTS "pg_trgm"')
         )
     async with async_session() as session:
-        from passlib.context import CryptContext
-        pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
         result = await session.execute(select(User).where(User.email == settings.superuser_email.lower()))
         user = result.scalar_one_or_none()
         if not user:
@@ -40,7 +38,10 @@ async def lifespan(app: FastAPI):
             session.add(user)
             await session.flush()
         if settings.superuser_password:
-            user.password_hash = pwd_ctx.hash(settings.superuser_password)
+            # Use bcrypt directly to avoid passlib's internal 72-byte test triggering ValueError on some bcrypt versions
+            import bcrypt
+            raw = settings.superuser_password.encode("utf-8")[:72]
+            user.password_hash = bcrypt.hashpw(raw, bcrypt.gensalt()).decode("ascii")
         await session.commit()
     yield
     await engine.dispose()

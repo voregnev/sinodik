@@ -281,9 +281,34 @@ async def login_superuser(email: str, password: str, db_session: AsyncSession) -
     user = result.scalar_one_or_none()
     if not user or not user.password_hash:
         return None
-    from passlib.context import CryptContext
-    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    if not pwd_ctx.verify(password, user.password_hash):
+    import bcrypt
+    raw = password.encode("utf-8")[:72]
+    hash_bytes = (user.password_hash or "").encode("ascii")
+    if not hash_bytes or not bcrypt.checkpw(raw, hash_bytes):
+        return None
+    token = create_jwt_token(user.email, user.role)
+    return {
+        "token": token,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role,
+            "is_active": user.is_active,
+        },
+    }
+
+
+async def login_via_nginx_basic(remote_user: str, db_session: AsyncSession) -> Optional[Dict[str, Any]]:
+    """Issue JWT for superuser when request came through nginx Basic Auth (X-Remote-User).
+
+    Only superuser_email is accepted. Used by GET /auth/login behind nginx auth_basic.
+    """
+    if not remote_user or remote_user.strip().lower() != settings.superuser_email.strip().lower():
+        return None
+    stmt = select(User).where(User.email == settings.superuser_email)
+    result = await db_session.execute(stmt)
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
         return None
     token = create_jwt_token(user.email, user.role)
     return {

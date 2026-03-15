@@ -146,7 +146,7 @@ async def find_or_create_person(
                     select(Person)
                     .where(text(
                         "embedding IS NOT NULL AND "
-                        "1 - (embedding <=> :vec::vector) > :threshold"
+                        "1 - (embedding <=> :vec ::vector) > :threshold"
                     ))
                     .params(vec=str(embedding), threshold=settings.dedup_threshold)
                     .limit(1)

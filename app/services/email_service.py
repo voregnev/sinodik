@@ -60,25 +60,34 @@ Sinodic Team
             smtp_username = settings.smtp_username
             smtp_password = settings.smtp_password
 
-            # Determine if SSL/TLS should be used
+            # use_ssl=True → port 465 implicit TLS (no STARTTLS).
+            # use_ssl=False, use_tls=True → port 587; aiosmtplib auto-upgrades via STARTTLS on connect — do NOT call starttls() manually or we get "Connection already using TLS".
             use_tls = settings.smtp_use_tls
             use_ssl = settings.smtp_use_ssl
 
-            # Create SMTP client based on configuration
+            timeout = settings.smtp_timeout
+
             if use_ssl:
+                # Port 465: TLS from the start. Many servers prefer 587+STARTTLS; if 465 times out, use port 587 and SINODIK_SMTP_USE_SSL=false.
                 smtp_client = aiosmtplib.SMTP(
                     hostname=smtp_host,
                     port=smtp_port,
                     use_tls=True,
-                    validate_certs=settings.smtp_validate_certs
+                    validate_certs=settings.smtp_validate_certs,
+                    timeout=timeout,
                 )
             else:
-                smtp_client = aiosmtplib.SMTP(hostname=smtp_host, port=smtp_port)
+                # Port 587: plain connect, STARTTLS is done automatically by aiosmtplib on connect when server advertises it
+                smtp_client = aiosmtplib.SMTP(
+                    hostname=smtp_host,
+                    port=smtp_port,
+                    use_tls=False,
+                    start_tls=use_tls,
+                    validate_certs=settings.smtp_validate_certs,
+                    timeout=timeout,
+                )
 
             async with smtp_client:
-                if use_tls and not use_ssl:
-                    await smtp_client.starttls(validate_certs=settings.smtp_validate_certs)
-
                 if smtp_username and smtp_password:
                     await smtp_client.login(smtp_username, smtp_password)
 

@@ -111,6 +111,7 @@ services:
         condition: service_healthy
       # ollama:
       #   condition: service_healthy
+    env_file: .env
     environment:
       PYTHONPATH: /app
       SINODIK_DATABASE_URL: postgresql+asyncpg://sinodik:sinodik@db:5432/sinodik
@@ -123,7 +124,19 @@ services:
       SINODIK_EMBEDDING_API_KEY: ${SINODIK_EMBEDDING_API_KEY:-ollama}
       SINODIK_EMBEDDING_MODEL: ${SINODIK_EMBEDDING_MODEL:-qwen3-embedding:0.6b}
       SINODIK_EMBEDDING_DIM: ${SINODIK_EMBEDDING_DIM:-384}
-      SINODIK_JWT_SECRET: dev-secret-change-in-prod
+      SINODIK_JWT_SECRET: ${SINODIK_JWT_SECRET:-dev-secret-change-in-prod}
+      SINODIK_JWT_TTL_DAYS: ${SINODIK_JWT_TTL_DAYS:-7}
+      SINODIK_ADMIN_EMAILS: ${SINODIK_ADMIN_EMAILS:-}
+      SINODIK_OTP_PLAINTEXT_FALLBACK: ${SINODIK_OTP_PLAINTEXT_FALLBACK:-false}
+      SINODIK_SMTP_HOST: ${SINODIK_SMTP_HOST:-localhost}
+      SINODIK_SMTP_PORT: ${SINODIK_SMTP_PORT:-587}
+      SINODIK_SMTP_USERNAME: ${SINODIK_SMTP_USERNAME:-}
+      SINODIK_SMTP_PASSWORD: ${SINODIK_SMTP_PASSWORD:-}
+      SINODIK_SMTP_FROM_ADDRESS: ${SINODIK_SMTP_FROM_ADDRESS:-noreply@sinodic.local}
+      SINODIK_SMTP_USE_TLS: ${SINODIK_SMTP_USE_TLS:-true}
+      SINODIK_SMTP_USE_SSL: ${SINODIK_SMTP_USE_SSL:-false}
+      SINODIK_SMTP_VALIDATE_CERTS: ${SINODIK_SMTP_VALIDATE_CERTS:-true}
+      SINODIK_SMTP_TIMEOUT: ${SINODIK_SMTP_TIMEOUT:-30}
     ports:
       - "8000:8000"
     volumes:
@@ -139,15 +152,15 @@ services:
     image: nginx:alpine
     container_name: sinodik-nginx
     restart: unless-stopped
-    command: ["sh", "-c", "touch /var/log/nginx/access.log /var/log/nginx/error.log && exec nginx -g 'daemon off;'"]
+    env_file: .env
     depends_on:
       - api
     ports:
       - "80:80"
     volumes:
       - ./frontend:/usr/share/nginx/html
-      - ./infra/nginx.dev.conf:/etc/nginx/conf.d/default.conf
-      - ./infra/htpasswd:/etc/nginx/.htpasswd:ro
+      - ./infra/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./infra/.htpasswd:/etc/nginx/.htpasswd:ro
       - ./infra/nginx-logs:/var/log/nginx
     networks:
       - sinodik_network
