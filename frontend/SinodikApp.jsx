@@ -1717,23 +1717,95 @@ function PersonManager() {
 }
 
 function SubmittersSection({ onSelectOrders }) {
+  const [expanded, setExpanded] = useState(false);
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editValues, setEditValues] = useState({});
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
     api("/admin/users").then(data => {
       setUsers(Array.isArray(data) ? data : []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (expanded) load();
+  }, [expanded, load]);
+
+  const startEdit = (u) => {
+    setEditingId(u.id);
+    setEditValues({ role: u.role || "user", is_active: u.is_active !== false });
+    setError(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditValues({});
+    setError(null);
+  };
+
+  const saveEdit = async (id) => {
+    setError(null);
+    try {
+      await apiOrThrow(`/admin/users/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ role: editValues.role, is_active: editValues.is_active }),
+      });
+      setEditingId(null);
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const handleDelete = async (id, email) => {
+    if (!window.confirm(`Удалить пользователя ${email}?`)) return;
+    setError(null);
+    try {
+      await apiOrThrow(`/admin/users/${id}`, { method: "DELETE" });
+      setEditingId(null);
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const buttonStyle = {
+    flex: 1, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer",
+    fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
+    background: expanded ? T.gold + "33" : T.card,
+    color: expanded ? T.gold : T.dim,
+  };
+
+  if (!expanded) {
+    return (
+      <div style={{ marginBottom: 16 }}>
+        <button onClick={() => setExpanded(true)} style={buttonStyle}>
+          Податели
+        </button>
+      </div>
+    );
+  }
+
   if (loading) return <Loading />;
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <h3 style={{ color: T.gold, fontSize: 16, fontFamily: "'Cormorant Garamond', serif", marginBottom: 10 }}>
-        Податели
-      </h3>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <h3 style={{ color: T.gold, fontSize: 16, fontFamily: "'Cormorant Garamond', serif", margin: 0 }}>
+          Податели
+        </h3>
+        <button onClick={() => setExpanded(false)} style={{
+          padding: "4px 10px", borderRadius: 6, border: `1px solid ${T.border}`,
+          background: "transparent", color: T.dim, cursor: "pointer", fontSize: 11,
+        }}>Свернуть</button>
+      </div>
+      {error && <div style={{ color: T.red, fontSize: 12, marginBottom: 8 }}>✗ {error}</div>}
       {users.length === 0 ? (
         <div style={{ color: T.dim, fontSize: 12 }}>Нет пользователей</div>
       ) : (
@@ -1742,27 +1814,60 @@ function SubmittersSection({ onSelectOrders }) {
             <div
               key={u.id}
               style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "10px 12px", background: T.card, borderRadius: 8,
-                borderLeft: `3px solid ${T.purple}`,
+                background: T.card, borderRadius: 8, borderLeft: `3px solid ${T.purple}`,
+                padding: "10px 12px",
               }}
             >
-              <div>
-                <span style={{ color: T.text, fontSize: 14 }}>{u.email}</span>
-                <div style={{ color: T.dim, fontSize: 11, marginTop: 2 }}>
-                  Записок: {u.orders_count ?? 0} · Активных: {u.active_commemoration_count ?? 0}
+              {editingId === u.id ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ color: T.dim, fontSize: 10, marginBottom: 2 }}>Роль</div>
+                  <select
+                    value={editValues.role}
+                    onChange={e => setEditValues(v => ({ ...v, role: e.target.value }))}
+                    style={{ ...InputStyle(), padding: "6px 10px", fontSize: 12, width: "100%", maxWidth: 200 }}
+                  >
+                    <option value="user">user</option>
+                    <option value="admin">admin</option>
+                  </select>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: T.text, fontSize: 12 }}>
+                    <input type="checkbox" checked={editValues.is_active} onChange={e => setEditValues(v => ({ ...v, is_active: e.target.checked }))} style={{ width: 16, height: 16 }} />
+                    Активен
+                  </label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={cancelEdit} style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${T.border}`, background: "transparent", color: T.dim, cursor: "pointer", fontSize: 11 }}>Отмена</button>
+                    <button onClick={() => saveEdit(u.id)} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: T.gold, color: T.bg, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>Сохранить</button>
+                  </div>
                 </div>
-              </div>
-              <button
-                onClick={() => onSelectOrders(u.email)}
-                style={{
-                  padding: "6px 12px", borderRadius: 6, border: "none", cursor: "pointer",
-                  background: T.gold + "33", color: T.gold, fontSize: 11, fontWeight: 600,
-                  fontFamily: "'JetBrains Mono', monospace",
-                }}
-              >
-                Заказы
-              </button>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div>
+                    <span style={{ color: T.text, fontSize: 14 }}>{u.email}</span>
+                    <div style={{ color: T.dim, fontSize: 11, marginTop: 2 }}>
+                      Записок: {u.orders_count ?? 0} · Активных: {u.active_commemoration_count ?? 0}
+                      {u.role && <Badge color={T.purple} style={{ marginLeft: 8 }}>{u.role}</Badge>}
+                      {u.is_active === false && <span style={{ color: T.red, marginLeft: 6 }}>неактивен</span>}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <button onClick={() => startEdit(u)} title="Редактировать" style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}>
+                      <Icon d={Icons.pencil} size={16} color={T.dim} />
+                    </button>
+                    <button onClick={() => handleDelete(u.id, u.email)} title="Удалить" style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}>
+                      <Icon d={Icons.trash} size={16} color={T.red + "aa"} />
+                    </button>
+                    <button
+                      onClick={() => onSelectOrders(u.email)}
+                      style={{
+                        padding: "6px 12px", borderRadius: 6, border: "none", cursor: "pointer",
+                        background: T.gold + "33", color: T.gold, fontSize: 11, fontWeight: 600,
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}
+                    >
+                      Заказы
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
