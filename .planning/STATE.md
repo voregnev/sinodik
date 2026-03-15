@@ -31,7 +31,7 @@ Plan: 02 of 04 in current phase (05-02 completed)
 Current Plan: 4
 Total Plans in Phase: 04
 Status: Phase 5 in progress
-Last activity: 2026-03-15 - Completed quick task 1: after user login field e-mail set to login email, read-only
+Last activity: 2026-03-15 - Completed quick task 2: add superuser from .env, undeletable, password login
 Last Activity: 2026-03-15
 
 Progress: [█████████░] 87%
@@ -97,6 +97,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 1 | After login, order form email pre-filled from login and read-only | 2026-03-15 | 300b081 | [1-after-user-login-field-e-mail-should-be-](./quick/1-after-user-login-field-e-mail-should-be-) |
+| 2 | Add superuser (login/password from .env), exists at startup, cannot be deleted | 2026-03-15 | ab5686e | [2-add-superuser-with-login-admin-and-passw](./quick/2-add-superuser-with-login-admin-and-passw/) |
 
 ## Session Continuity
 
