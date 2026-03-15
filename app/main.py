@@ -8,15 +8,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import select
 
 from config import settings
-from database import engine
+from database import engine, async_session
+from models.models import User
 from api.routes import upload, orders, names, health, commemorations, persons, auth, admin
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Ensure extensions exist. Schema is managed by Alembic migrations (run at container start)."""
+    """Ensure extensions exist. Bootstrap superuser. Schema is managed by Alembic migrations (run at container start)."""
     async with engine.begin() as conn:
         await conn.execute(
             __import__("sqlalchemy").text("CREATE EXTENSION IF NOT EXISTS vector")
@@ -24,6 +26,22 @@ async def lifespan(app: FastAPI):
         await conn.execute(
             __import__("sqlalchemy").text('CREATE EXTENSION IF NOT EXISTS "pg_trgm"')
         )
+    async with async_session() as session:
+        from passlib.context import CryptContext
+        pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        result = await session.execute(select(User).where(User.email == settings.superuser_email.lower()))
+        user = result.scalar_one_or_none()
+        if not user:
+            user = User(
+                email=settings.superuser_email.lower(),
+                role="admin",
+                is_active=True,
+            )
+            session.add(user)
+            await session.flush()
+        if settings.superuser_password:
+            user.password_hash = pwd_ctx.hash(settings.superuser_password)
+        await session.commit()
     yield
     await engine.dispose()
 

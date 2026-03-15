@@ -232,6 +232,7 @@ class User(Base):
     email = Column(String(255), nullable=False, unique=True, index=True)
     role = Column(String(20), nullable=False, default="user")   # "user" | "admin"
     is_active = Column(Boolean, nullable=False, default=True)
+    password_hash = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
     def __repr__(self):

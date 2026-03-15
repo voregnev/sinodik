@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     jwt_ttl_days: int = 7                  # SINODIK_JWT_TTL_DAYS
     admin_emails: Union[str, List[str]] = Field(default=[])  # SINODIK_ADMIN_EMAILS (comma-separated)
     otp_plaintext_fallback: bool = False   # SINODIK_OTP_PLAINTEXT_FALLBACK
+    superuser_email: str = "admin@example.com"   # SINODIK_SUPERUSER_EMAIL
+    superuser_password: str | None = None         # SINODIK_SUPERUSER_PASSWORD (optional)
 
     # SMTP
     smtp_host: str = "localhost"           # SINODIK_SMTP_HOST
@@ -40,6 +42,7 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True              # SINODIK_SMTP_USE_TLS
     smtp_use_ssl: bool = False             # SINODIK_SMTP_USE_SSL
     smtp_validate_certs: bool = True       # SINODIK_SMTP_VALIDATE_CERTS
+    smtp_timeout: int = 30                 # SINODIK_SMTP_TIMEOUT (seconds)
 
     @field_validator("admin_emails", mode="before")
     @classmethod
