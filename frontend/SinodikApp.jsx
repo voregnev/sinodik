@@ -83,6 +83,7 @@ async function apiOrThrow(path, opts = {}) {
     try { const b = await res.json(); if (b.detail) detail = b.detail; } catch {}
     throw new Error(detail);
   }
+  if (res.status === 204) return null;
   return res.json();
 }
 
@@ -1717,9 +1718,9 @@ function PersonManager() {
 }
 
 function SubmittersSection({ onSelectOrders }) {
-  const [expanded, setExpanded] = useState(false);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({});
   const [error, setError] = useState(null);
@@ -1733,9 +1734,10 @@ function SubmittersSection({ onSelectOrders }) {
     }).catch(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (expanded) load();
-  }, [expanded, load]);
+  useEffect(() => { load(); }, [load]);
+
+  const q = search.trim().toLowerCase();
+  const filteredUsers = q ? users.filter(u => (u.email || "").toLowerCase().includes(q)) : users;
 
   const startEdit = (u) => {
     setEditingId(u.id);
@@ -1764,53 +1766,46 @@ function SubmittersSection({ onSelectOrders }) {
   };
 
   const handleDelete = async (id, email) => {
-    if (!window.confirm(`Удалить пользователя ${email}?`)) return;
     setError(null);
     try {
       await apiOrThrow(`/admin/users/${id}`, { method: "DELETE" });
       setEditingId(null);
       load();
     } catch (e) {
-      setError(e.message);
+      if (e.message && e.message.includes("404")) {
+        setEditingId(null);
+        load();
+        setError("Пользователь уже удалён");
+      } else {
+        setError(e.message);
+      }
     }
   };
 
-  const buttonStyle = {
-    flex: 1, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer",
-    fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
-    background: expanded ? T.gold + "33" : T.card,
-    color: expanded ? T.gold : T.dim,
-  };
-
-  if (!expanded) {
-    return (
-      <div style={{ marginBottom: 16 }}>
-        <button onClick={() => setExpanded(true)} style={buttonStyle}>
-          Податели
-        </button>
-      </div>
-    );
-  }
-
   if (loading) return <Loading />;
 
+  const inputSt = { ...InputStyle(), padding: "6px 10px", fontSize: 12 };
+
   return (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <h3 style={{ color: T.gold, fontSize: 16, fontFamily: "'Cormorant Garamond', serif", margin: 0 }}>
-          Податели
-        </h3>
-        <button onClick={() => setExpanded(false)} style={{
-          padding: "4px 10px", borderRadius: 6, border: `1px solid ${T.border}`,
-          background: "transparent", color: T.dim, cursor: "pointer", fontSize: 11,
-        }}>Свернуть</button>
+    <div>
+      <div style={{ marginBottom: 12, display: "flex", gap: 8, alignItems: "center" }}>
+        <input
+          type="text"
+          placeholder="Поиск по email..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ ...inputSt, flex: 1, maxWidth: 280 }}
+        />
       </div>
       {error && <div style={{ color: T.red, fontSize: 12, marginBottom: 8 }}>✗ {error}</div>}
-      {users.length === 0 ? (
-        <div style={{ color: T.dim, fontSize: 12 }}>Нет пользователей</div>
+      <div style={{ color: T.dim, fontSize: 11, marginBottom: 8 }}>
+        {q ? `Показано: ${filteredUsers.length} из ${users.length}` : `Всего: ${users.length}`}
+      </div>
+      {filteredUsers.length === 0 ? (
+        <div style={{ color: T.dim, fontSize: 12 }}>{q ? "Нет совпадений" : "Нет пользователей"}</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {users.map(u => (
+          {filteredUsers.map(u => (
             <div
               key={u.id}
               style={{
@@ -1886,31 +1881,33 @@ function DbManagePage({ user }) {
     setSection("orders");
   };
 
+  const dbTabs = isAdmin
+    ? [
+        { id: "submitters", label: "Податели" },
+        { id: "commemorations", label: "Поминовения" },
+        { id: "orders", label: "Записки" },
+        { id: "persons", label: "Словарь имён" },
+      ]
+    : [
+        { id: "commemorations", label: "Поминовения" },
+        { id: "orders", label: "Записки" },
+        { id: "persons", label: "Словарь имён" },
+      ];
+
   return (
     <div style={{ padding: 16 }}>
       <h2 style={{ margin: "0 0 12px", color: T.gold, fontSize: 20, fontFamily: "'Cormorant Garamond', serif" }}>
         База данных
       </h2>
 
-      {isAdmin && (
-        <>
-          <SubmittersSection onSelectOrders={handleSelectOrders} />
-          <div style={{ borderTop: `1px solid ${T.border}`, marginBottom: 16 }} />
-        </>
-      )}
-
       <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-        {[
-          { id: "commemorations", label: "Поминовения" },
-          { id: "orders", label: "Записки" },
-          { id: "persons", label: "Словарь имён" },
-        ].map(s => (
-          <button key={s.id} onClick={() => { setSection(s.id); if (s.id !== "orders") setFilterByUserEmail(null); }} style={{
-            flex: 1, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer",
-            fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
-            background: section === s.id ? T.gold + "33" : T.card,
-            color: section === s.id ? T.gold : T.dim,
-          }}>{s.label}</button>
+        {dbTabs.map(s => (
+            <button key={s.id} onClick={() => { setSection(s.id); if (s.id !== "orders") setFilterByUserEmail(null); }} style={{
+              flex: 1, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
+              background: section === s.id ? T.gold + "33" : T.card,
+              color: section === s.id ? T.gold : T.dim,
+            }}>{s.label}</button>
         ))}
       </div>
 
@@ -1926,6 +1923,7 @@ function DbManagePage({ user }) {
         </div>
       )}
 
+      {section === "submitters" && <SubmittersSection onSelectOrders={handleSelectOrders} />}
       {section === "commemorations" && <CommemorationManager />}
       {section === "orders" && <OrderManager filterByUserEmail={filterByUserEmail} />}
       {section === "persons" && <PersonManager />}
@@ -2127,7 +2125,7 @@ export default function SinodikApp() {
     }
   }, [user, tab, visibleTabs]);
 
-  // Hydrate user from localStorage token on mount
+  // Hydrate user from localStorage token on mount. On any /me failure (401, 502, network) clear token so user sees login.
   useEffect(() => {
     const stored = localStorage.getItem(AUTH_KEY);
     if (!stored) {
@@ -2136,20 +2134,22 @@ export default function SinodikApp() {
     }
     fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${stored}` } })
       .then((res) => {
-        if (res.status === 401) {
+        if (res.status === 401 || !res.ok) {
           localStorage.removeItem(AUTH_KEY);
           setToken(null);
           setUser(null);
           return;
         }
-        if (res.ok) {
-          return res.json().then((data) => {
-            setToken(stored);
-            setUser(data);
-          });
-        }
+        return res.json().then((data) => {
+          setToken(stored);
+          setUser(data);
+        });
       })
-      .catch(() => setUser(null));
+      .catch(() => {
+        localStorage.removeItem(AUTH_KEY);
+        setToken(null);
+        setUser(null);
+      });
   }, []);
 
   return (
