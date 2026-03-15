@@ -31,7 +31,7 @@ Plan: 02 of 04 in current phase (05-02 completed)
 Current Plan: 4
 Total Plans in Phase: 04
 Status: Phase 5 in progress
-Last activity: 2026-03-15 - Completed quick task 4: admin БД — список подателей как Словарь имён, без суперпользователя
+Last activity: 2026-03-15 - Completed quick task 5: закладка БД — четыре вкладки, поиск по подателям
 Last Activity: 2026-03-15
 
 Progress: [█████████░] 87%
@@ -100,6 +100,7 @@ None yet.
 | 2 | Add superuser (login/password from .env), exists at startup, cannot be deleted | 2026-03-15 | ab5686e | [2-add-superuser-with-login-admin-and-passw](./quick/2-add-superuser-with-login-admin-and-passw/) |
 | 3 | Solve login mess: cannot login with super admin password; auth review and rewrite login flow | 2026-03-15 | 87f91dd | [3-solve-login-mess-cannot-login-with-super](./quick/3-solve-login-mess-cannot-login-with-super/) |
 | 4 | Admin БД: exclude superuser from users list; Податели UI like Names (edit, delete, Заказы); list on demand; Заказы → tab with filter | 2026-03-15 | e461395 | [4-admin-db-exclude-superuser-from-users-li](./quick/4-admin-db-exclude-superuser-from-users-li/) |
+| 5 | Закладка БД: четыре вкладки вверху (Податели, Поминовения, Записки, Словарь имён); Податели с активным поиском по email | 2026-03-15 | f08b67e | [5-db-four-tabs-submitters-search](./quick/5-db-four-tabs-submitters-search/) |
 
 ## Session Continuity
 
