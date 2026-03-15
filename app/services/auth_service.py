@@ -266,6 +266,37 @@ async def _get_or_create_user(email: str, db_session: AsyncSession) -> Optional[
         return result.scalar_one_or_none()
 
 
+async def login_superuser(email: str, password: str, db_session: AsyncSession) -> Optional[Dict[str, Any]]:
+    """Log in superuser by email + password. Returns JWT and user dict or None.
+
+    Only the account with email matching settings.superuser_email can use password login.
+    Requires SINODIK_SUPERUSER_PASSWORD to be set and user to have password_hash.
+    """
+    if email.lower() != settings.superuser_email.lower():
+        return None
+    if not settings.superuser_password:
+        return None
+    stmt = select(User).where(User.email == email.lower())
+    result = await db_session.execute(stmt)
+    user = result.scalar_one_or_none()
+    if not user or not user.password_hash:
+        return None
+    from passlib.context import CryptContext
+    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    if not pwd_ctx.verify(password, user.password_hash):
+        return None
+    token = create_jwt_token(user.email, user.role)
+    return {
+        "token": token,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role,
+            "is_active": user.is_active,
+        },
+    }
+
+
 def create_jwt_token(email: str, role: str) -> str:
     """Create a JWT token with email, role, and expiration claims.
 

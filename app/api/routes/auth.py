@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.models import User
-from services.auth_service import request_otp, verify_otp
+from services.auth_service import request_otp, verify_otp, login_superuser
 from api.deps import get_current_user
 
 router = APIRouter()
@@ -19,6 +19,11 @@ class RequestOtpBody(BaseModel):
 class VerifyOtpBody(BaseModel):
     email: str
     code: str
+
+
+class LoginPasswordBody(BaseModel):
+    email: str
+    password: str
 
 
 @router.post("/auth/request-otp", status_code=202)
@@ -45,6 +50,15 @@ async def verify_otp_endpoint(body: VerifyOtpBody, db: AsyncSession = Depends(ge
     result = await verify_otp(body.email, body.code, db)
     if result is None:
         raise HTTPException(status_code=401, detail="Invalid or expired code")
+    return {"token": result["token"], "user": result["user"]}
+
+
+@router.post("/auth/password-login")
+async def password_login_endpoint(body: LoginPasswordBody, db: AsyncSession = Depends(get_db)):
+    """Superuser login by email + password from env. Returns token and user; 401 for invalid credentials."""
+    result = await login_superuser(body.email, body.password, db)
+    if result is None:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     return {"token": result["token"], "user": result["user"]}
 
 
