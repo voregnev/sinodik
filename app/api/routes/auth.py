@@ -1,12 +1,13 @@
-"""Auth HTTP endpoints: request-otp, verify-otp, me."""
+"""Auth HTTP endpoints: request-otp, verify-otp, me, login (Basic Auth gate), login-method, password-login."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
 from database import get_db
 from models.models import User
-from services.auth_service import request_otp, verify_otp, login_superuser
+from services.auth_service import request_otp, verify_otp, login_superuser, login_via_nginx_basic
 from api.deps import get_current_user
 
 router = APIRouter()
@@ -53,12 +54,34 @@ async def verify_otp_endpoint(body: VerifyOtpBody, db: AsyncSession = Depends(ge
     return {"token": result["token"], "user": result["user"]}
 
 
+@router.get("/auth/login-method")
+async def login_method_endpoint(email: str):
+    """Return login method for the given email: password (superuser) or otp. Does not leak superuser email."""
+    if not email or not email.strip():
+        return {"method": "otp"}
+    normalized = email.strip().lower()
+    if normalized == settings.superuser_email.lower() and settings.superuser_password:
+        return {"method": "password"}
+    return {"method": "otp"}
+
+
 @router.post("/auth/password-login")
 async def password_login_endpoint(body: LoginPasswordBody, db: AsyncSession = Depends(get_db)):
     """Superuser login by email + password from env. Returns token and user; 401 for invalid credentials."""
     result = await login_superuser(body.email, body.password, db)
     if result is None:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"token": result["token"], "user": result["user"]}
+
+
+@router.get("/auth/login")
+async def login_via_basic(request: Request, db: AsyncSession = Depends(get_db)):
+    """Issue JWT when called with X-Remote-User (set by nginx after Basic Auth). Only superuser_email is accepted.
+    Protect this path with auth_basic in nginx; all other endpoints remain open and use JWT."""
+    remote_user = request.headers.get("X-Remote-User")
+    result = await login_via_nginx_basic(remote_user or "", db)
+    if result is None:
+        raise HTTPException(status_code=401, detail="Invalid or missing X-Remote-User")
     return {"token": result["token"], "user": result["user"]}
 
 
